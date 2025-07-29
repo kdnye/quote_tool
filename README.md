@@ -1,6 +1,4 @@
 # quote_tool
-Here's a draft `README.md` file for your GitHub project based on the code and database files you've provided:
-
 ---
 
 # 📦 Quote Tool
@@ -106,11 +104,8 @@ Password must:
 
 ## 📌 Roadmap / TODO
 
-* ✅ Add Air quoting model
+* ✅ Add Intl Air quoting model
 * ⏳ Implement export/download of quote history
-* ⏳ Localization (e.g., Mexico VAT support)
-* ⏳ Replace Google Maps API with OSRM for cost control
+* ⏳ Replace Google Maps API with PC Miler
 
 ---
-
-Let me know if you'd like this saved to a file or formatted for GitHub-flavored Markdown.
