@@ -1,0 +1,7 @@
+streamlit
+pandas
+requests
+sqlalchemy
+openpyxl
+python-dotenv
+Werkzeug

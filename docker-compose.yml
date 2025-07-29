@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  quote_tool:
+    build: .
+    container_name: quote_tool
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app  # Mount all files (db, Excel, Python code)
+    environment:
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    restart: unless-stopped
