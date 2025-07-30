@@ -1,0 +1,23 @@
+# Use official Windows image with Python
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Install Python
+RUN powershell -Command \
+    Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe -OutFile python.exe ; \
+    Start-Process python.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=1' -Wait ; \
+    Remove-Item python.exe
+
+# Add your app code
+COPY . /app
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install pyinstaller
+
+# Build the .exe
+RUN pyinstaller --add-data "HotShot Quote.xlsx;." --noconfirm --onefile run_app.py
+
+# Output the .exe
+CMD powershell -Command "Get-ChildItem dist\\run_app.exe"
