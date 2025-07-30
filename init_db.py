@@ -1,8 +1,11 @@
+#init_db.py
 import os
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey, inspect
 from sqlalchemy.orm import declarative_base, sessionmaker
 from werkzeug.security import generate_password_hash
+from sqlalchemy.sql import func
+import uuid
 
 # === SQLite DB Path ===
 DB_PATH = "app.db"
@@ -28,11 +31,13 @@ class User(Base):
 class Quote(Base):
     __tablename__ = "quotes"
     id = Column(Integer, primary_key=True)
+    quote_id = Column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     quote_type = Column(String(20))  # hotshot or air
     origin = Column(String(20))
     destination = Column(String(20))
     weight = Column(Float)
+    weight_method = Column(String(20))  # NEW
     zone = Column(String(5))
     total = Column(Float)
     quote_metadata = Column(Text)

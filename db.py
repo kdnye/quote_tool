@@ -2,6 +2,8 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
+from sqlalchemy.sql import func
+import uuid
 
 DB_PATH = "sqlite:///app.db"
 engine = create_engine(DB_PATH)
@@ -26,11 +28,14 @@ class User(Base):
 class Quote(Base):
     __tablename__ = 'quotes'
     id = Column(Integer, primary_key=True)
+    quote_id = Column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
     user_id = Column(Integer, ForeignKey('users.id'))
+    user_email = Column(String(100))
     quote_type = Column(String(20))
     origin = Column(String(20))
     destination = Column(String(20))
     weight = Column(Float)
+    weight_method = Column(String(20))  # NEW
     zone = Column(String(5))
     total = Column(Float)
     quote_metadata = Column(String)

@@ -1,3 +1,4 @@
+#quote.py
 import streamlit as st  
 import pandas as pd
 import os
@@ -55,9 +56,36 @@ def get_distance_miles(origin_zip, destination_zip):
             return meters / 1609.344  # exact float
     except:
         return None
+def quote_admin_view():
+    inject_fsi_theme()
+    st.subheader("📦 All Submitted Quotes")
+
+    db = Session()
+    quotes = db.query(Quote).all()
+    db.close()
+
+    import pandas as pd
+    df = pd.DataFrame([{
+        "Quote ID": q.quote_id,
+        "User ID": q.user_id,
+        "User Email": q.user_email,
+        "Type": q.quote_type,
+        "Origin": q.origin,
+        "Destination": q.destination,
+        "Weight": q.weight,
+        "Method": q.weight_method,
+        "Zone": q.zone,
+        "Total": q.total,
+        "Accessorials": q.quote_metadata,
+        "Date": q.created_at.strftime("%Y-%m-%d %H:%M")
+    } for q in quotes])
+
+    st.dataframe(df)
 
 def quote_ui():
     inject_fsi_theme()
+    if "email" not in st.session_state:
+        st.session_state.email = ""
     st.image("FSI-logo.png", width=280)
     st.title("📦 Quote Tool")
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
@@ -235,16 +263,19 @@ def quote_ui():
             db = Session()
             quote = Quote(
                 user_id=st.session_state.user,
+                user_email = st.session_state.get("email", ""),
                 quote_type=quote_mode,
                 origin=origin,
                 destination=destination,
                 weight=weight,
+                weight_method="Dimensional" if weight_input_method == "Dimensional Weight" else "Actual",
                 zone=zone if quote_mode == "Hotshot" else str(concat),
                 total=quote_total,
                 quote_metadata=", ".join(selected)
             )
             db.add(quote)
             db.commit()
+            st.write(f"Quote ID: {quote.quote_id}")
             db.close()
             book_url = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
             st.markdown(f"""

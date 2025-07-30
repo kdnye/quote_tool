@@ -1,3 +1,4 @@
+#auth.py
 import streamlit as st
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
@@ -12,18 +13,24 @@ def is_valid_password(password):
 
 def login_ui():
     st.subheader("🔑 Login")
+    role_selection = st.radio("Login as", ["user", "admin"], horizontal=True, key="login_role")  # NEW
     email = st.text_input("Email", key="login_email")
     password = st.text_input("Password", type="password", key="login_password")
+    
     if st.button("Login"):
         db = Session()
         user = db.query(User).filter_by(email=email).first()
         if user and check_password_hash(user.password_hash, password):
-            st.session_state.user = user.id
-            st.session_state.name = user.name
-            st.session_state.role = user.role
-            st.session_state.page = "admin" if user.role == "admin" else "quote"
-            st.success(f"Welcome {user.name}!")
-            st.rerun()
+            if user.role != role_selection:
+                st.error(f"Access denied. This account is not registered as a '{role_selection}'.")
+            else:
+                st.session_state.user = user.id
+                st.session_state.name = user.name
+                st.session_state.email = user.email
+                st.session_state.role = user.role
+                st.session_state.page = "admin" if user.role == "admin" else "quote"
+                st.success(f"Welcome {user.name}!")
+                st.rerun()
         else:
             st.error("Invalid credentials.")
         db.close()
