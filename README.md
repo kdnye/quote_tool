@@ -1,23 +1,39 @@
-# quote_tool
----
-
 # 📦 Quote Tool
 
-A Streamlit-based internal web app for generating logistics pricing quotes based on origin/destination ZIP codes, shipment weight, and optional accessorials. The app supports two quoting modes: **Hotshot** and **Air**.
+An internal Streamlit web app to generate logistics pricing quotes based on ZIP codes, shipment weight (actual or dimensional), and accessorial charges. Supports two quote types: **Hotshot** and **Air**.
 
 ---
 
 ## 🚀 Features
 
-* 🔐 User Authentication (Registration, Login, Password Reset)
-* 📬 Admin Dashboard for user management (approve, delete, change roles)
-* 📈 Dynamic Quote Calculation based on:
+### 🔐 User Authentication
 
-  * Mileage (Google Maps API)
-  * Rate tables from `HotShot Quote.xlsx`
-  * Optional accessorial charges
-* 🧾 Quote History saved per user in a local SQLite database
-* 🧪 Simple database setup and auto-table creation on startup
+* Registration, Login, Password Reset
+* Password complexity enforcement
+
+### 🧑‍💼 Admin Dashboard
+
+* Approve users
+* Change user roles
+* Delete users
+
+### 📈 Dynamic Quote Engine
+
+* Selectable quote mode: Hotshot or Air
+* Actual weight or dimensional weight calculation
+* Optional accessorials (based on mode)
+* Mileage calculation via Google Maps API
+* Rate logic driven by Excel (`HotShot Quote.xlsx`)
+* Quote warnings for:
+
+  * Total > \$6000
+  * Weight > 1200 lbs (Air) or 5000 lbs (Hotshot)
+* Launch "Book Shipment" link when quote is returned
+
+### 📂 Quote Storage
+
+* Quotes saved to `app.db` per user
+* Includes all quote metadata
 
 ---
 
@@ -33,18 +49,18 @@ Python 3.8+
 pip install -r requirements.txt
 ```
 
-<sub>Example packages used: `streamlit`, `sqlalchemy`, `pandas`, `openpyxl`, `werkzeug`, `requests`</sub>
+Key packages: `streamlit`, `sqlalchemy`, `pandas`, `openpyxl`, `werkzeug`, `requests`
 
 ### 3. Required Files
 
 Place the following in your project root:
 
-* `HotShot Quote.xlsx` — contains rate tables for both quote types
+* `HotShot Quote.xlsx` — contains rate tables and accessorials
 * `.env` file with your Google Maps API key:
 
-```
-GOOGLE_MAPS_API_KEY=your_api_key_here
-```
+  ```
+  GOOGLE_MAPS_API_KEY=your_api_key_here
+  ```
 
 ### 4. Launch the App
 
@@ -56,24 +72,21 @@ streamlit run app.py
 
 ## 🔧 Admin Access
 
-Upon first run, a default admin account is seeded:
+A default admin account is seeded on first run:
 
 * **Email:** `admin@example.com`
 * **Password:** `SuperSecurePass!123`
-
-Change this in `init_db.py` if needed.
+  *(Change in `init_db.py` if needed)*
 
 ---
 
-## 🗃 Database Schema
+## 🗓 Database Schema
 
-SQLite database (`app.db`) contains:
-
-### `users`
+### `users` Table
 
 * `id`, `name`, `email`, `phone`, `business_name`, `password_hash`, `role`, `is_approved`, `created_at`
 
-### `quotes`
+### `quotes` Table
 
 * `id`, `user_id`, `quote_type`, `origin`, `destination`, `weight`, `zone`, `total`, `quote_metadata`, `created_at`
 
@@ -81,31 +94,55 @@ SQLite database (`app.db`) contains:
 
 ## 📋 Accessorial Charges
 
-Defined dynamically per mode (Hotshot or Air) from `Accessorials` sheet in the workbook. Added interactively during quoting.
+* Pulled dynamically from Excel
+* Separate options for Hotshot and Air
+* Accessorial totals included in final quote
 
 ---
 
 ## 🔒 Password Requirements
 
-Password must:
-
-* Be **≥14 characters** with a mix of uppercase, lowercase, number, symbol
-* **OR** be a **24+ character passphrase** (letters only)
-
----
-
-## 🧑‍💻 Developer Notes
-
-* Streamlit session state drives user context and page navigation
-* SQLAlchemy handles ORM and DB schema
-* Admin actions (approve, change role, delete) use raw SQL commands for simplicity
+* Minimum 14 characters with mix of upper/lower/number/symbol
+  **OR**
+* Passphrase ≥24 characters (letters only)
 
 ---
 
-## 📌 Roadmap / TODO
+## 💡 Developer Notes
 
-* ✅ Add Intl Air quoting model
-* ⏳ Implement export/download of quote history
-* ⏳ Replace Google Maps API with PC Miler
+* Streamlit session state used for auth + page routing
+* SQLAlchemy manages all ORM/database logic
+* Rate logic isolated from DB to allow workbook-driven pricing
+* Admin panel uses raw SQL for clarity and simplicity
 
 ---
+
+## 📌 Roadmap / Next Steps
+
+1. **Quote Traceability & Auditability**
+
+   * Store complete quote details:
+
+     * Origin/Destination
+     * Accessorials
+     * Quoted weight
+     * Weight method (actual/dimensional)
+     * Unique Quote ID
+
+2. **Customer-Specific Rate Support**
+
+   * Store and use different rate matrices per customer login
+
+3. **Robust Quote History Backend**
+
+   * Enable querying, filtering, and exporting of prior quotes
+
+4. **Email Quote Request Button**
+
+   * Adds `$15 administrative fee`
+   * Launches a form for:
+
+     * Shipper/Consignee details
+   * Triggers local email client with:
+
+     * Formatted `.csv` attachment compatible with TMS
