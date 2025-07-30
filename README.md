@@ -146,3 +146,6 @@ A default admin account is seeded on first run:
    * Triggers local email client with:
 
      * Formatted `.csv` attachment compatible with TMS
+5. **International Air Quoting**
+   * Much like the current Air quote tool with some additional bells and whistles to account for the varriances of intl cargo moves
+
