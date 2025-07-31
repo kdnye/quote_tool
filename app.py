@@ -1,26 +1,34 @@
-#app.py
+# app.py
+
 import streamlit as st
 from auth import login_ui, register_ui
-from quote import quote_ui
+from quote.ui import quote_ui
+from quote.admin_view import quote_admin_view
 from admin import admin_panel
 
 st.set_page_config("Quote Tool", layout="wide")
 
+# Initialize session state
 if "page" not in st.session_state:
     st.session_state.page = "auth"
 
+# Routing
 if st.session_state.page == "auth":
-    mode = st.radio("Choose Action", ["Login", "Register"])
-    login_ui() if mode == "Login" else register_ui()
+    st.image("FSI-logo.png", width=240)
+    mode = st.radio("Choose Action", ["Login", "Register"], horizontal=True)
+    if mode == "Login":
+        login_ui()
+    else:
+        register_ui()
+
 elif st.session_state.page == "quote":
     quote_ui()
+
 elif st.session_state.page == "admin":
     st.title("🛠️ Admin Dashboard")
-    choice = st.radio("Choose admin function", ["Manage Users", "View Quotes"], horizontal=True)
+    admin_mode = st.radio("Choose admin function", ["Manage Users", "View Quotes"], horizontal=True)
 
-    if choice == "Manage Users":
-        from admin import admin_panel
+    if admin_mode == "Manage Users":
         admin_panel()
-    elif choice == "View Quotes":
-        from quote import quote_admin_view
+    elif admin_mode == "View Quotes":
         quote_admin_view()

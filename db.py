@@ -41,5 +41,22 @@ class Quote(Base):
     quote_metadata = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="quotes")
+    
+class EmailQuoteRequest(Base):
+    __tablename__ = 'email_quote_requests'
+    id = Column(Integer, primary_key=True)
+    quote_id = Column(String(36), ForeignKey('quotes.quote_id'), nullable=False)
+    shipper_name = Column(String)
+    shipper_address = Column(String)
+    shipper_contact = Column(String)
+    shipper_phone = Column(String)
+    consignee_name = Column(String)
+    consignee_address = Column(String)
+    consignee_contact = Column(String)
+    consignee_phone = Column(String)
+    total_weight = Column(Float)
+    special_instructions = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 Base.metadata.create_all(engine)
