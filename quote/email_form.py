@@ -7,17 +7,22 @@ import csv
 from io import StringIO
 import pandas as pd
 
-# Try to import normalize_workbook from the package if present
+# Workbook helpers & Air math
 try:
-    from quote.utils import normalize_workbook  # to read accessorial prices from the workbook
+    from quote.utils import normalize_workbook  # read/normalize workbook sheets
 except Exception:
     normalize_workbook = None
+
+try:
+    from quote.logic_air import calculate_air_quote  # recompute pre-guarantee Air total
+except Exception:
+    calculate_air_quote = None
 
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
 ADMIN_FEE = 15.00  # Email-only processing fee
 
 
-# ---------- helpers ----------
+# ---------- DB & workbook helpers ----------
 def _load_quote_from_db(quote_id: str):
     """Fetch a quote by UUID and map to the dict shape this UI expects."""
     if not quote_id:
@@ -38,11 +43,11 @@ def _load_quote_from_db(quote_id: str):
         "quote_type": q.quote_type or "",
         "accessorials": accessorials,
         "guarantee_selected": guarantee_selected,
-        "quote_total": float(q.total or 0.0),  # base total from DB (no $15 fee)
+        "quote_total": float(q.total or 0.0),  # stored total (may already include guarantee)
     }
 
 
-def _first_numeric_in_column(series: pd.Series) -> float:
+def _first_numeric(series: pd.Series) -> float:
     """Return the first numeric-looking value in a column; handle $, commas, %, and skip instructions."""
     for val in series.tolist():
         s = str(val).strip()
@@ -51,7 +56,7 @@ def _first_numeric_in_column(series: pd.Series) -> float:
         if "multiply" in s.lower():
             continue
         s = s.replace("$", "").replace(",", "")
-        if s.endswith("%"):  # percentage-type (e.g., Guarantee) not part of fixed-$ subtotal
+        if s.endswith("%"):
             continue
         try:
             return float(s)
@@ -62,33 +67,31 @@ def _first_numeric_in_column(series: pd.Series) -> float:
 
 def _accessorial_prices(selected_names):
     """
-    Return ([(name, price), ...], subtotal) using the 'Accessorials' sheet headers.
-    Guarantee is excluded here and handled as a separate line item.
+    Return ([(name, price), ...], subtotal) from Accessorials sheet headers.
+    Guarantee is excluded here (it's a percent and shown separately).
     """
+    names = [n for n in (selected_names or []) if "guarantee" not in str(n).lower()]
+
     try:
         wb = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
         if normalize_workbook:
             wb = normalize_workbook(wb)
         df = wb["Accessorials"]
     except Exception:
-        # On workbook read issues, fall back to $0 rows so email still formats
-        clean = [n for n in (selected_names or []) if "guarantee" not in str(n).lower()]
-        return [(name, 0.0) for name in clean], 0.0
+        return [(name, 0.0) for name in names], 0.0
 
-    rows = []
-    subtotal = 0.0
-    for name in (selected_names or []):
-        if "guarantee" in str(name).lower():
-            continue
-        price = _first_numeric_in_column(df[name]) if name in df.columns else 0.0
+    rows, subtotal = [], 0.0
+    for name in names:
+        price = _first_numeric(df[name]) if name in df.columns else 0.0
         price = float(price or 0.0)
         rows.append((name, price))
         subtotal += price
-    return rows, round(float(subtotal), 2)
+    return rows, round(subtotal, 2)
 
 
+# ---------- session hydration ----------
 def _hydrate_query_params():
-    """Support both modern and legacy Streamlit query params APIs."""
+    """Supports both modern and legacy Streamlit query params APIs."""
     try:
         qp = st.query_params
         if qp:
@@ -107,8 +110,8 @@ def _coalesce_session_and_db():
       1) st.session_state,
       2) URL ?quote_id=,
       3) DB lookup,
-      4) reconstruction from common loose session keys (best-effort).
-    Persist any recovered values back to st.session_state.
+      4) reconstruction from common loose session keys.
+    Persist back to st.session_state if recovered.
     """
     ss = st.session_state
     quote_id = ss.get("quote_id")
@@ -121,11 +124,11 @@ def _coalesce_session_and_db():
             qv = qp["quote_id"]
             quote_id = qv[0] if isinstance(qv, list) else qv
 
-    # 3) DB
+    # 3) DB by quote_id
     if not quote_details and quote_id:
         quote_details = _load_quote_from_db(quote_id)
 
-    # 4) Reconstruct from loose session keys if needed
+    # 4) Reconstruct from loose keys if needed
     if not quote_details:
         origin = ss.get("origin") or ss.get("origin_zip") or ss.get("pickup_zip") or ""
         destination = ss.get("destination") or ss.get("destination_zip") or ss.get("deliver_zip") or ""
@@ -144,7 +147,7 @@ def _coalesce_session_and_db():
                 "quote_total": base_total,
             }
 
-    # Persist back
+    # Persist
     if quote_id and "quote_id" not in ss:
         ss.quote_id = quote_id
     if quote_details and "quote_details" not in ss:
@@ -166,10 +169,9 @@ def email_form_ui():
         st.warning("No active quote found in session.")
         return
 
-    # Compute totals/flags (base_total is the quote's stored total; email adds $15 admin fee)
+    # Totals/flags
     base_total = float(quote_details.get("quote_total", 0.0) or 0.0)
     email_total = base_total + ADMIN_FEE
-
     selected_accessorials = quote_details.get("accessorials", [])
     guarantee_selected = bool(
         quote_details.get("guarantee_selected")
@@ -245,7 +247,7 @@ def email_form_ui():
         total_weight, special_instructions, f"{base_total:.2f}", f"{email_total:.2f}"
     ])
 
-    # -------------------- Email body (established fixed-width formatting) --------------------
+    # -------------------- Email body (aligned format + correct Guarantee) --------------------
     def _fmt_money(x: float) -> str:
         return f"${x:,.2f}"
 
@@ -259,20 +261,42 @@ def email_form_ui():
     # Accessorial rows & subtotal from workbook headers
     acc_rows, acc_subtotal = _accessorial_prices(selected_accessorials)
 
-    # Presentational Guarantee amount:
-    # If final = base * 1.25, then guarantee = final * 0.20
+    # Guarantee amount:
+    # Recompute the pre‑guarantee Air total using the same logic as the quote screen,
+    # then take 25% of that base. Fallback to 20% of stored total if workbook/logic unavailable.
     guarantee_amount = 0.0
-    if guarantee_selected and (quote_details.get("quote_type", "") == "Air") and base_total > 0:
-        guarantee_amount = round(base_total * 0.20, 2)
+    if guarantee_selected and str(quote_details.get("quote_type", "")).lower() == "air":
+        pre_air_total = None
+        try:
+            if calculate_air_quote is not None:
+                wb = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+                if normalize_workbook:
+                    wb = normalize_workbook(wb)
+                pre = calculate_air_quote(
+                    origin=quote_details.get("origin", ""),
+                    destination=quote_details.get("destination", ""),
+                    weight=float(quote_details.get("weight", 0.0) or 0.0),
+                    accessorial_total=float(acc_subtotal or 0.0),  # fixed-$ accessorials only
+                    workbook=wb,
+                )
+                pre_air_total = float(pre.get("quote_total", 0.0) or 0.0)
+        except Exception:
+            pre_air_total = None
 
-    acc_plus_guarantee_subtotal = round(acc_subtotal + guarantee_amount, 2)
+        if pre_air_total is not None and pre_air_total > 0:
+            guarantee_amount = round(pre_air_total * 0.25, 2)
+        else:
+            # Safe fallback if we couldn't recompute base
+            guarantee_amount = round(base_total * 0.20, 2) if base_total > 0 else 0.0
+
+    acc_plus_guarantee_subtotal = round(float(acc_subtotal or 0.0) + float(guarantee_amount or 0.0), 2)
 
     lines = []
-    # Header triplet
+    # Header
     lines.append(f"Origin: {quote_details.get('origin','')}")
     lines.append(f"Destination: {quote_details.get('destination','')}")
     lines.append(f"Weight: {total_weight}")
-    lines.append("")  # blank
+    lines.append("")
 
     # Accessorials block
     lines.append("Accessorials")
@@ -283,18 +307,17 @@ def email_form_ui():
     lines.append(_line("Subtotal:", acc_subtotal))
     lines.append(SEP)
 
-    # Guarantee on a single aligned line
     if guarantee_selected:
         lines.append(f"{'Guarantee (25%)':<{NAME_COL}}{_fmt_money(guarantee_amount):>{AMT_COL}}")
         lines.append(SEP)
         lines.append(_line("Accessorials + Guarantee Subtotal:", acc_plus_guarantee_subtotal))
         lines.append(SEP)
 
-    lines.append("")  # blank
+    lines.append("")
     lines.append(f"Quote Total: {_fmt_money(email_total)} (includes {_fmt_money(ADMIN_FEE)} email admin fee)")
-    lines.append("")  # blank
+    lines.append("")
 
-    # Footer block (restored)
+    # Footer block
     lines.append("Shipper info:")
     lines.append(f"Name: {shipper_name}")
     lines.append(f"Address: {shipper_address}")
@@ -312,7 +335,7 @@ def email_form_ui():
 
     email_body = "\n".join(lines) + "\n"
 
-    # Build mailto (avoid nested f-strings to keep parsing simple)
+    # Mailto link (no nested f-strings)
     subject_text = f"Quote Request for ID: {quote_id or '(no id)'}"
     subject_enc = urllib.parse.quote(subject_text)
     body_enc = urllib.parse.quote(email_body)
