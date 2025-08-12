@@ -167,6 +167,7 @@ def quote_ui():
                 origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
             )
             quote_total = result["quote_total"]
+            st.caption(f"DEBUG miles: {result.get('miles', 0):.2f}")
 
         # Persist “last quote” in session (same behavior as your current file)
         st.session_state.quote_total = quote_total
