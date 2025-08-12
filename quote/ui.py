@@ -47,7 +47,7 @@ def _headers_as_accessorials(df: pd.DataFrame) -> list[str]:
 
 def quote_ui():
     inject_fsi_theme()
-
+    st.warning("RUNNING quote/ui.py vMULTI-PIECE-TEST")
     # basic session defaults
     if "email" not in st.session_state:
         st.session_state.email = ""
@@ -124,6 +124,8 @@ def quote_ui():
         dim_factor = 166.0
         per_piece_dim = (length * width * height) / dim_factor
         dim_weight = per_piece_dim * pieces
+
+        st.write({"pieces": pieces, "per_piece_dim": per_piece_dim, "dim_weight_total": dim_weight})
 
         # Make it crystal clear in the UI
         st.caption(f"Dim factor: {dim_factor:.0f}")
