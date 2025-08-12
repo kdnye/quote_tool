@@ -7,7 +7,7 @@ import csv
 from io import StringIO
 import pandas as pd
 
-# If your package is "quote", utils lives there
+# Try to import normalize_workbook from the package if present
 try:
     from quote.utils import normalize_workbook  # to read accessorial prices from the workbook
 except Exception:
@@ -312,11 +312,11 @@ def email_form_ui():
 
     email_body = "\n".join(lines) + "\n"
 
-    mailto_link = (
-        "mailto:operations@fsi.com"
-        f"?subject={urllib.parse.quote(f'Quote Request for ID: {quote_id or \"(no id)\"}')}"
-        f"&body={urllib.parse.quote(email_body)}"
-    )
+    # Build mailto (avoid nested f-strings to keep parsing simple)
+    subject_text = f"Quote Request for ID: {quote_id or '(no id)'}"
+    subject_enc = urllib.parse.quote(subject_text)
+    body_enc = urllib.parse.quote(email_body)
+    mailto_link = f"mailto:operations@fsi.com?subject={subject_enc}&body={body_enc}"
 
     # Launch email client button
     st.markdown(
