@@ -1,16 +1,13 @@
-# Directory: quote/
-# File: email_form.py
 import streamlit as st
 from db import Session, EmailQuoteRequest, Quote
 import urllib.parse
 import csv
 from io import StringIO
-import pandas as pd
-from quote.utils import normalize_workbook  # read accessorial prices from the workbook
 
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
+ADMIN_FEE = 15.00  # Email-only processing fee
 
-# ---------- helpers ----------
+
 def _load_quote_from_db(quote_id: str):
     if not quote_id:
         return None
@@ -19,63 +16,33 @@ def _load_quote_from_db(quote_id: str):
     db.close()
     if not q:
         return None
+    # Rebuild the dict the UI expects (BASE total only; fee is added on this page)
     accessorials = []
-    if getattr(q, "quote_metadata", None):
-        accessorials = [s.strip() for s in str(q.quote_metadata).split(",") if s.strip()]
+    if q.quote_metadata:
+        accessorials = [s.strip() for s in str(q.quote_metadata).split(",") if s and s.strip()]
+    guarantee_selected = any("guarantee" in s.lower() for s in accessorials)
     return {
-        "origin": getattr(q, "origin", "") or "",
-        "destination": getattr(q, "destination", "") or "",
-        "weight": float(getattr(q, "weight", 0.0) or 0.0),
-        "quote_type": getattr(q, "quote_type", "") or "",
+        "origin": q.origin or "",
+        "destination": q.destination or "",
+        "weight": float(q.weight or 0.0),
+        "quote_type": q.quote_type or "",
         "accessorials": accessorials,
-        "quote_total": float(getattr(q, "total", 0.0) or 0.0),
+        "guarantee_selected": guarantee_selected,
+        "quote_total": float(q.total or 0.0),  # base total from DB
     }
 
-def _first_numeric_in_column(series: pd.Series) -> float:
-    for val in series.tolist():
-        s = str(val).strip()
-        if not s:
-            continue
-        if "multiply" in s.lower():
-            continue
-        s = s.replace("$", "").replace(",", "")
-        if s.endswith("%"):
-            continue
-        try:
-            return float(s)
-        except Exception:
-            continue
-    return 0.0
 
-def _accessorial_prices(selected_names):
-    """Return ([(name, price), ...], subtotal) from the Accessorials sheet headers."""
-    try:
-        wb = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
-        wb = normalize_workbook(wb)
-        df = wb["Accessorials"]
-    except Exception:
-        return [(name, 0.0) for name in selected_names], 0.0
-
-    rows = []
-    subtotal = 0.0
-    for name in selected_names:
-        if "guarantee" in str(name).lower():
-            continue
-        price = _first_numeric_in_column(df[name]) if name in df.columns else 0.0
-        rows.append((name, float(price)))
-        subtotal += float(price)
-    return rows, subtotal
-
-# ---------- main UI ----------
 def email_form_ui():
     st.subheader("Email Quote Request ($15 Admin Fee)")
     st.markdown("Please fill out the form below to request a booking for this quote. The information will be sent to the FSI Operations Team.")
 
     # Read quote_id from the URL for new-tab flows
-    qp = st.query_params
-    qp_quote_id = qp["quote_id"][0] if isinstance(qp.get("quote_id"), list) else qp.get("quote_id")
+    qp = st.query_params  # modern API
+    qp_quote_id = None
+    if qp.get("quote_id"):
+        qp_quote_id = qp["quote_id"][0] if isinstance(qp["quote_id"], list) else qp["quote_id"]
 
-    # If session is missing the quote (brand-new tab), backfill from DB
+    # If session is missing the quote (new tab), backfill from query param + DB
     if "quote_id" not in st.session_state and qp_quote_id:
         st.session_state.quote_id = qp_quote_id
     if "quote_details" not in st.session_state and qp_quote_id:
@@ -90,16 +57,19 @@ def email_form_ui():
     quote_details = st.session_state.quote_details
     quote_id = st.session_state.quote_id
 
-    # Build accessorials data + guarantee amount for email body
-    selected_accessorials = quote_details.get("accessorials", [])
-    acc_rows, acc_subtotal = _accessorial_prices(selected_accessorials)
-    guarantee_selected = any("guarantee" in str(x).lower() for x in selected_accessorials)
-    final_total = float(quote_details.get("quote_total", 0.0))
-    guarantee_amount = 0.0
-    if guarantee_selected and (quote_details.get("quote_type", "") == "Air") and final_total > 0:
-        # If final = base*1.25, then guarantee = final * 0.20
-        guarantee_amount = round(final_total * 0.20, 2)
-    acc_plus_guarantee_subtotal = round(acc_subtotal + guarantee_amount, 2)
+    # Compute email-only totals/flags
+    base_total = float(quote_details.get("quote_total", 0.0) or 0.0)
+    email_total = base_total + ADMIN_FEE
+    guarantee_selected = bool(
+        quote_details.get("guarantee_selected")
+        or any("guarantee" in s.lower() for s in quote_details.get("accessorials", []))
+    )
+
+    # Show a banner clarifying why the total differs here
+    st.info(
+        f"Email processing adds a ${ADMIN_FEE:.2f} admin fee. "
+        f"The 'Book Quote' button does not include this fee."
+    )
 
     with st.form("email_quote_form"):
         st.subheader("Shipper Information")
@@ -122,135 +92,111 @@ def email_form_ui():
         )
         special_instructions = st.text_area(
             "Special Instructions",
-            value=", ".join(selected_accessorials)
+            value=", ".join(quote_details.get("accessorials", []))
         )
 
         submitted = st.form_submit_button("Submit & Launch Email")
 
-    if not submitted:
-        return
+    if submitted:
+        # Save record
+        db = Session()
+        new_request = EmailQuoteRequest(
+            quote_id=quote_id,
+            shipper_name=shipper_name,
+            shipper_address=shipper_address,
+            shipper_contact=shipper_contact,
+            shipper_phone=shipper_phone,
+            consignee_name=consignee_name,
+            consignee_address=consignee_address,
+            consignee_contact=consignee_contact,
+            consignee_phone=consignee_phone,
+            total_weight=float(total_weight),
+            special_instructions=special_instructions
+        )
+        db.add(new_request)
+        db.commit()
+        db.close()
+        st.success("Quote request saved!")
 
-    # Save the request
-    db = Session()
-    new_request = EmailQuoteRequest(
-        quote_id=quote_id,
-        shipper_name=shipper_name,
-        shipper_address=shipper_address,
-        shipper_contact=shipper_contact,
-        shipper_phone=shipper_phone,
-        consignee_name=consignee_name,
-        consignee_address=consignee_address,
-        consignee_contact=consignee_contact,
-        consignee_phone=consignee_phone,
-        total_weight=float(total_weight),
-        special_instructions=special_instructions
-    )
-    db.add(new_request)
-    db.commit()
-    db.close()
-    st.success("Quote request saved!")
+        # CSV export
+        csv_data = StringIO()
+        writer = csv.writer(csv_data)
+        writer.writerow([
+            "Quote ID","Shipper Name","Shipper Address","Shipper Contact","Shipper Phone",
+            "Consignee Name","Consignee Address","Consignee Contact","Consignee Phone",
+            "Total Weight","Special Instructions","Base Total","Email Total (incl. $15)"
+        ])
+        writer.writerow([
+            quote_id, shipper_name, shipper_address, shipper_contact, shipper_phone,
+            consignee_name, consignee_address, consignee_contact, consignee_phone,
+            total_weight, special_instructions, f"{base_total:.2f}", f"{email_total:.2f}"
+        ])
 
-    # CSV export
-    csv_data = StringIO()
-    writer = csv.writer(csv_data)
-    writer.writerow([
-        "Quote ID","Shipper Name","Shipper Address","Shipper Contact","Shipper Phone",
-        "Consignee Name","Consignee Address","Consignee Contact","Consignee Phone",
-        "Total Weight","Special Instructions"
-    ])
-    writer.writerow([
-        quote_id, shipper_name, shipper_address, shipper_contact, shipper_phone,
-        consignee_name, consignee_address, consignee_contact, consignee_phone,
-        total_weight, special_instructions
-    ])
-    st.download_button(
-        label="Download CSV",
-        data=csv_data.getvalue(),
-        file_name="quote_request.csv",
-        mime="text/csv"
-    )
+        # Build and open email (new tab)
+        email_body = f"""FSI Operations Team,
 
-    # ---------- EMAIL BODY FORMATTING (aligned table + footer info) ----------
-    def _fmt_money(x: float) -> str:
-        return f"${x:,.2f}"
+I'd like to move forward with the shipment for this quote. Please proceed with scheduling and confirm once booked.
 
-    NAME_COL = 28
-    AMT_COL = 12
-    SEP = "-" * 12
+Origin: {quote_details.get("origin","")}
+Shipper info:
+Name: {shipper_name}
+Address: {shipper_address}
+Contact: {shipper_contact}
+Phone: {shipper_phone}
 
-    def _line(name: str, amount: float) -> str:
-        return f"{name:<{NAME_COL}}{_fmt_money(amount):>{AMT_COL}}"
+Destination: {quote_details.get("destination","")}
+Consignee info:
+Name: {consignee_name}
+Address: {consignee_address}
+Contact: {consignee_contact}
+Phone: {consignee_phone}
 
-    lines = []
-    # Header triplet
-    lines.append(f"Origin: {quote_details.get('origin','')}")
-    lines.append(f"Destination: {quote_details.get('destination','')}")
-    lines.append(f"Weight: {total_weight}")
-    lines.append("")  # blank line
+Weight: {total_weight}
+Accessorials: {', '.join(quote_details.get('accessorials', []))}
+Guarantee: {"Yes" if guarantee_selected else "No"}
+Quote Total: ${email_total:,.2f} (includes ${ADMIN_FEE:.2f} email admin fee)
 
-    # Accessorials section
-    lines.append("Accessorials")
-    lines.append(SEP)
-    for name, price in acc_rows:
-        lines.append(_line(name, price))
-    lines.append(SEP)
-    lines.append(_line("Subtotal:", acc_subtotal))
-    lines.append(SEP)
+Let me know if any additional info is needed.
 
-    # Guarantee (own block, amount on its own line, then separator)
-    if guarantee_selected:
-        lines.append(f"{'Guarantee (25%)':<25}{_fmt_money(guarantee_amount)}")
-        lines.append(SEP)
-        lines.append(_line("Accessorials + Guarantee Subtotal:", acc_plus_guarantee_subtotal))
-        lines.append(SEP)
+Quote ID: {quote_id}
+"""
+        mailto_link = (
+            "mailto:operations@fsi.com"
+            f"?subject={urllib.parse.quote(f'Quote Request for ID: {quote_id}')}"
+            f"&body={urllib.parse.quote(email_body)}"
+        )
 
-    lines.append("")  # blank line
-    lines.append(f"Quote Total: {_fmt_money(final_total)}")
-    lines.append("")  # blank line
+        st.markdown(
+            f"""
+            <a href="{mailto_link}" target="_blank" rel="noopener noreferrer">
+                <button style="background-color:#005B99;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;">
+                    Launch Email Client
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
-    # Footer block you wanted (restored)
-    lines.append("Shipper info:")
-    lines.append(f"Name: {shipper_name}")
-    lines.append(f"Address: {shipper_address}")
-    lines.append(f"Contact: {shipper_contact}")
-    lines.append(f"Phone: {shipper_phone}")
-    lines.append("")
-    lines.append("Consignee info:")
-    lines.append(f"Name: {consignee_name}")
-    lines.append(f"Address: {consignee_address}")
-    lines.append(f"Contact: {consignee_contact}")
-    lines.append(f"Phone: {consignee_phone}")
-    lines.append("")
-    lines.append(f"Accessorials Selected: {', '.join(selected_accessorials)}")
-    lines.append(f"Quote ID: {quote_id}")
+        st.download_button(
+            label="Download CSV",
+            data=csv_data.getvalue(),
+            file_name="quote_request.csv",
+            mime="text/csv"
+        )
 
-    email_body = "\n".join(lines) + "\n"
+        st.markdown(
+            f"""
+            <a href="{BOOK_URL}" target="_blank" rel="noopener noreferrer">
+                <button style="margin-top:8px;padding:10px 20px;font-size:16px;background-color:#005B99;color:white;border:none;border-radius:5px;">
+                    Book Quote
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
-    mailto_link = (
-        "mailto:operations@fsi.com"
-        f"?subject={urllib.parse.quote(f'Quote Request for ID: {quote_id}')}"
-        f"&body={urllib.parse.quote(email_body)}"
-    )
-
-    # Auto-launch the email client immediately (no separate button)
-    st.components.v1.html(
-        f"""
-        <html>
-          <head><meta http-equiv="refresh" content="0; url={mailto_link}"></head>
-          <body></body>
-        </html>
-        """,
-        height=0,
-    )
-
-    # Optional: quick booking button remains visible after launch
-    st.markdown(
-        f"""
-        <a href="{BOOK_URL}" target="_blank" rel="noopener noreferrer">
-            <button style="margin-top:8px;padding:10px 20px;font-size:16px;background-color:#005B99;color:white;border:none;border-radius:5px;">
-                Book Quote
-            </button>
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
+        if st.button("Get New Quote"):
+            for k in ("quote_total", "quote_id", "quote_details"):
+                st.session_state.pop(k, None)
+            st.session_state.page = "quote"
+            st.rerun()

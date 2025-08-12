@@ -7,6 +7,7 @@ from quote.theme import inject_fsi_theme
 from quote.utils import normalize_workbook
 from quote.logic_hotshot import calculate_hotshot_quote
 from quote.logic_air import calculate_air_quote
+from db import Session, Quote  # NEW: persist quotes so email page can load by quote_id
 import uuid
 
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
@@ -68,7 +69,7 @@ def quote_ui():
         details = st.session_state.quote_details
         st.success(f"**Quote Total:** ${details['quote_total']:,.2f}")
         st.markdown(f"**Origin:** {details['origin']} | **Destination:** {details['destination']}")
-        st.markdown(f"**Type:** {details['quote_type']} | **Weight:** {details['weight']:.2f} lbs")
+        st.markdown(f"**Type:** {details['quote_type']} | **Weight:** {details['weight']} lbs")
 
         # Open email form in a NEW TAB and pass quote_id for the new tab to load from DB/session
         email_url = f"?page=email_request&quote_id={st.session_state.get('quote_id', '')}"
@@ -110,23 +111,14 @@ def quote_ui():
         actual_weight = st.number_input("Enter actual weight (lbs)", min_value=1.0, step=1.0)
 
         st.markdown("**Enter package dimensions (inches):**")
-        pieces = int(st.number_input("Number of Pieces", min_value=1, value=1))
-        length = st.number_input("Length", min_value=1.0, value=1.0)
-        width = st.number_input("Width", min_value=1.0, value=1.0)
-        height = st.number_input("Height", min_value=1.0, value=1.0)
+        pieces = st.number_input("Number of Pieces", min_value=1)
+        length = st.number_input("Length", min_value=1.0)
+        width = st.number_input("Width", min_value=1.0)
+        height = st.number_input("Height", min_value=1.0)
 
-        # Dimensional weight: per-piece dim using 166, then multiply by number of pieces
-        dim_factor = 166.0
-        per_piece_dim = (length * width * height) / dim_factor
-        dim_weight = per_piece_dim * pieces
-
-        # Display both for clarity
-        st.caption(f"Dim factor: {dim_factor:.0f}")
-        st.markdown(f"Per‑piece Dimensional Weight: **{per_piece_dim:,.2f} lbs**")
-        st.markdown(f"Total Dimensional Weight ({pieces} pcs): **{dim_weight:,.2f} lbs**")
-
-        # Billable = max(actual vs total dimensional)
-        weight = max(float(actual_weight), float(dim_weight))
+        dim_weight = (length * width * height) / 250  # using 250 divisor per your prior version
+        st.markdown(f"Dimensional Weight: {dim_weight:,.2f} lbs")
+        weight = max(actual_weight, dim_weight)
         st.info(f"Using a billable weight of {weight:,.2f} lbs")
 
     # Right column: accessorials from HEADERS
@@ -167,18 +159,43 @@ def quote_ui():
                 origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
             )
             quote_total = result["quote_total"]
-            st.caption(f"DEBUG miles: {result.get('miles', 0):.2f}")
 
-        # Persist “last quote” in session (same behavior as your current file)
-        st.session_state.quote_total = quote_total
-        st.session_state.quote_id = str(uuid.uuid4())
+        # Persist to DB so the email page (new tab) can load via ?quote_id=...
+        db = Session()
+        q = Quote(
+            user_id=st.session_state.get("user"),
+            user_email=st.session_state.get("email", ""),
+            quote_type=quote_mode,
+            origin=origin,
+            destination=destination,
+            weight=weight,
+            weight_method="Dimensional" if weight == dim_weight else "Actual",
+            zone=str(result.get("zone", "")),
+            total=quote_total,                         # store BASE total (no admin fee)
+            quote_metadata=", ".join(selected),        # store selected accessorials as CSV
+            pieces=int(pieces),
+            length=float(length),
+            width=float(width),
+            height=float(height),
+            actual_weight=float(actual_weight),
+            dim_weight=float(dim_weight),
+        )
+        db.add(q)
+        db.commit()
+        # SQLAlchemy populates q.quote_id (UUID default on model)
+        saved_quote_id = q.quote_id
+        db.close()
+
+        # Persist “last quote” in session (BASE total — no admin fee here)
+        st.session_state.quote_id = saved_quote_id
         st.session_state.quote_details = {
             "origin": origin,
             "destination": destination,
             "weight": weight,
             "quote_type": quote_mode,
             "accessorials": selected,
-            "quote_total": quote_total,
+            "guarantee_selected": guarantee_selected,
+            "quote_total": quote_total,   # base total for display; email page adds $15
             "metadata": result,
         }
 
