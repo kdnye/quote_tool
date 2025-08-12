@@ -1,16 +1,16 @@
+# Directory: quote/
+# File: ui.py
+
 import streamlit as st
 import pandas as pd
 from quote.theme import inject_fsi_theme
 from quote.utils import normalize_workbook
 from quote.logic_hotshot import calculate_hotshot_quote
 from quote.logic_air import calculate_air_quote
-from db import Session, Quote
 import uuid
 
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
 
-
-# ---------- Helpers for Accessorials (headers-based) ----------
 
 def _first_numeric_in_column(series: pd.Series) -> float:
     """Return the first numeric value in a column; handle $, commas, %, and skip instructions."""
@@ -23,7 +23,7 @@ def _first_numeric_in_column(series: pd.Series) -> float:
             continue
         s = s.replace("$", "").replace(",", "")
         if s.endswith("%"):
-            # Subtotal includes fixed-$ accessorials; percentage (e.g., Guarantee) handled separately
+            # Subtotal only includes fixed-$ accessorials; percentage handled separately (e.g., Guarantee)
             continue
         try:
             return float(s)
@@ -43,25 +43,20 @@ def _headers_as_accessorials(df: pd.DataFrame) -> list[str]:
     return headers
 
 
-# ---------- Main UI ----------
-
 def quote_ui():
     inject_fsi_theme()
-    st.warning("RUNNING quote/ui.py vMULTI-PIECE-TEST")
-    # basic session defaults
+
     if "email" not in st.session_state:
         st.session_state.email = ""
 
     st.image("FSI-logo.png", width=280)
     st.title("📦 Quote Tool")
 
-    # logout
     if st.button("Logout"):
         st.session_state.page = "auth"
         st.session_state.clear()
         st.rerun()
 
-    # inputs + workbook
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
     workbook = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
     workbook = normalize_workbook(workbook)
@@ -75,7 +70,7 @@ def quote_ui():
         st.markdown(f"**Origin:** {details['origin']} | **Destination:** {details['destination']}")
         st.markdown(f"**Type:** {details['quote_type']} | **Weight:** {details['weight']:.2f} lbs")
 
-        # New-tab Email (passes quote_id so the other tab can load from DB)
+        # Open email form in a NEW TAB and pass quote_id for the new tab to load from DB/session
         email_url = f"?page=email_request&quote_id={st.session_state.get('quote_id', '')}"
         st.markdown(
             f"""
@@ -120,14 +115,12 @@ def quote_ui():
         width = st.number_input("Width", min_value=1.0, value=1.0)
         height = st.number_input("Height", min_value=1.0, value=1.0)
 
-        # Always use dim factor of 166 and multiply by number of pieces
+        # Dimensional weight: per-piece dim using 166, then multiply by number of pieces
         dim_factor = 166.0
         per_piece_dim = (length * width * height) / dim_factor
         dim_weight = per_piece_dim * pieces
 
-        st.write({"pieces": pieces, "per_piece_dim": per_piece_dim, "dim_weight_total": dim_weight})
-
-        # Make it crystal clear in the UI
+        # Display both for clarity
         st.caption(f"Dim factor: {dim_factor:.0f}")
         st.markdown(f"Per‑piece Dimensional Weight: **{per_piece_dim:,.2f} lbs**")
         st.markdown(f"Total Dimensional Weight ({pieces} pcs): **{dim_weight:,.2f} lbs**")
@@ -136,7 +129,7 @@ def quote_ui():
         weight = max(float(actual_weight), float(dim_weight))
         st.info(f"Using a billable weight of {weight:,.2f} lbs")
 
-    # Right column: Accessorials from HEADERS
+    # Right column: accessorials from HEADERS
     with col2:
         st.subheader("⚙️ Accessorials")
         selected: list[str] = []
@@ -161,8 +154,7 @@ def quote_ui():
 
     # ---------- Generate Quote ----------
     if st.button("Generate Quote"):
-        # pass fixed-$ accessorials into the calculators
-        accessorial_total = subtotal
+        accessorial_total = subtotal  # pass fixed-$ accessorials into the calculators
 
         if quote_mode == "Air":
             result = calculate_air_quote(origin, destination, weight, accessorial_total, workbook)
@@ -170,42 +162,15 @@ def quote_ui():
             if guarantee_selected:
                 # Apply Guarantee last (25% multiplier)
                 quote_total *= 1.25
-            zone_value = str(result.get("zone", ""))
         else:
             result = calculate_hotshot_quote(
                 origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
             )
             quote_total = result["quote_total"]
-            zone_value = str(result.get("zone", ""))
 
-        # Persist the quote to DB so the Email tab can reload it by quote_id
-        db = Session()
-        quote_row = Quote(
-            user_id=st.session_state.get("user"),
-            user_email=st.session_state.get("email", ""),
-            quote_type=quote_mode,
-            origin=origin,
-            destination=destination,
-            weight=float(weight),
-            weight_method="Dimensional" if dim_weight >= actual_weight else "Actual",
-            actual_weight=float(actual_weight),
-            dim_weight=float(dim_weight),
-            pieces=int(pieces),
-            length=float(length),
-            width=float(width),
-            height=float(height),
-            zone=zone_value,
-            total=float(quote_total),
-            quote_metadata=", ".join(selected),
-        )
-        db.add(quote_row)
-        db.commit()
-        saved_quote_id = quote_row.quote_id
-        db.close()
-
-        # Persist “last quote” in session
-        st.session_state.quote_id = saved_quote_id
+        # Persist “last quote” in session (same behavior as your current file)
         st.session_state.quote_total = quote_total
+        st.session_state.quote_id = str(uuid.uuid4())
         st.session_state.quote_details = {
             "origin": origin,
             "destination": destination,
