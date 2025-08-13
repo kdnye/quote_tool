@@ -67,9 +67,14 @@ def quote_ui():
     if "quote_details" in st.session_state:
         st.subheader("Last Quote")
         details = st.session_state.quote_details
-        st.success(f"**Quote Total:** ${details['quote_total']:,.2f}")
-        st.markdown(f"**Origin:** {details['origin']} | **Destination:** {details['destination']}")
-        st.markdown(f"**Type:** {details['quote_type']} | **Weight:** {details['weight']} lbs")
+        big_text = f"""
+        <div style='font-size: 2em; line-height: 1.4;'>
+            Quote Total:${details['quote_total']:,.2f}<br>
+            Origin: {details['origin']} | Destination: {details['destination']}<br>
+            Type: {details['quote_type']} | Weight: {details['weight']:,.2f} lbs<br>
+        </div>
+        """
+        st.markdown(big_text, unsafe_allow_html=True)
 
         # Open email form in a NEW TAB and pass quote_id for the new tab to load from DB/session
         email_url = f"?page=email_request&quote_id={st.session_state.get('quote_id', '')}"
