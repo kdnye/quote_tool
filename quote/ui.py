@@ -115,8 +115,9 @@ def quote_ui():
         length = st.number_input("Length", min_value=1.0)
         width = st.number_input("Width", min_value=1.0)
         height = st.number_input("Height", min_value=1.0)
-
-        dim_weight = (length * width * height) / 250  # using 250 divisor per your prior version
+        #FSI uses a dim factor of 166
+        dim_weight = ((length * width * height) / 166 )*pieces
+     
         st.markdown(f"Dimensional Weight: {dim_weight:,.2f} lbs")
         weight = max(actual_weight, dim_weight)
         st.info(f"Using a billable weight of {weight:,.2f} lbs")

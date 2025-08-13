@@ -6,6 +6,8 @@ import urllib.parse
 import csv
 from io import StringIO
 import pandas as pd
+import streamlit.components.v1 as components
+
 
 # Workbook helpers & Air math
 try:
@@ -292,7 +294,10 @@ def email_form_ui():
     acc_plus_guarantee_subtotal = round(float(acc_subtotal or 0.0) + float(guarantee_amount or 0.0), 2)
 
     lines = []
+    #intro
+    lines.append(f"I'd like to go ahead and book the following quote")
     # Header
+    lines.append(f"")
     lines.append(f"Origin: {quote_details.get('origin','')}")
     lines.append(f"Destination: {quote_details.get('destination','')}")
     lines.append(f"Weight: {total_weight}")
@@ -336,30 +341,72 @@ def email_form_ui():
     email_body = "\n".join(lines) + "\n"
 
     # Mailto link (no nested f-strings)
-    subject_text = f"Quote Request for ID: {quote_id or '(no id)'}"
-    subject_enc = urllib.parse.quote(subject_text)
-    body_enc = urllib.parse.quote(email_body)
-    mailto_link = f"mailto:operations@fsi.com?subject={subject_enc}&body={body_enc}"
+    
 
     # Launch email client button
-    st.markdown(
-        f"""
-        <a href="{mailto_link}" target="_blank" rel="noopener noreferrer">
-            <button style="background-color:#005B99;color:white;border:none;padding:10px 20px;border-radius:5px;font-size:16px;">
-                Launch Email Client
-            </button>
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
+    # -------------------- Email body & mailto link (you already compute email_body, subject_enc, body_enc) --------------------
+    # Build mailto with CRLFs so Outlook/Apple Mail render line breaks
+    subject_text = f"Quote Request for ID: {quote_id or '(no id)'}"
+    subject_enc  = urllib.parse.quote(subject_text, safe="")
+    body_enc     = urllib.parse.quote(email_body.replace("\n", "\r\n"), safe="")
+    mailto_link  = f"mailto:operations@freightservices.net?subject={subject_enc}&body={body_enc}"
 
-    # CSV Download
+    try:
+        st.html( f"""
+            <a id="ml" href="{mailto_link}" target="_self" style="display:none;">open</a>
+            <script>
+            (function() {{
+                // Try actual click on an anchor (most reliable inside iframes)
+                var a = document.getElementById('ml');
+                if (a && a.click) a.click();
+
+                // Fallback 1: open in a new window/tab
+                try {{ window.open("{mailto_link}", "_blank"); }} catch (e) {{}}
+
+                // Fallback 2: attempt to change parent/top location (may be blocked)
+                try {{ window.parent.location.href = "{mailto_link}"; }} catch (e) {{}}
+                try {{ window.top.location.href = "{mailto_link}"; }} catch (e) {{}}
+            }})();
+            </script>
+            <div style="margin-top:8px;">
+            If your email client didn't open, <a href="{mailto_link}">click here to launch it</a>.
+            </div>
+            """,
+            height=60,
+        )
+    except Exception:
+        components.html(f"""
+            <a id="ml" href="{mailto_link}" target="_self" style="display:none;">open</a>
+            <script>
+            (function() {{
+                // Try actual click on an anchor (most reliable inside iframes)
+                var a = document.getElementById('ml');
+                if (a && a.click) a.click();
+
+                // Fallback 1: open in a new window/tab
+                try {{ window.open("{mailto_link}", "_blank"); }} catch (e) {{}}
+
+                // Fallback 2: attempt to change parent/top location (may be blocked)
+                try {{ window.parent.location.href = "{mailto_link}"; }} catch (e) {{}}
+                try {{ window.top.location.href = "{mailto_link}"; }} catch (e) {{}}
+            }})();
+            </script>
+            <div style="margin-top:8px;">
+            If your email client didn't open, <a href="{mailto_link}">click here to launch it</a>.
+            </div>
+            """,
+            height=60,
+        ) 
+# Auto-launch email client after successful submit+save
+    
+    # CSV Download (keep as-is)
     st.download_button(
         label="Download CSV",
         data=csv_data.getvalue(),
         file_name="quote_request.csv",
         mime="text/csv"
     )
+
 
     # Quick Book button
     st.markdown(
