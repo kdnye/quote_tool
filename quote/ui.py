@@ -133,6 +133,9 @@ def quote_ui():
         selected: list[str] = []
 
         accessorial_options = _headers_as_accessorials(accessorials_df)
+        if quote_mode == "Hotshot":
+            accessorial_options = [a for a in accessorial_options if "guarantee" not in a.lower()]
+
         for i, acc in enumerate(accessorial_options):
             if st.checkbox(acc, key=f"acc_{i}"):
                 selected.append(acc)
