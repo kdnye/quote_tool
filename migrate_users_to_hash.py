@@ -5,9 +5,11 @@ from werkzeug.security import generate_password_hash
 
 
 def needs_hash(pw: str) -> bool:
-    """Detect if the stored password looks unhashed."""
+    """Detect if the stored password looks unhashed.
 
-    return ":" not in pw
+    Werkzeug hashes typically include a '$' separator.
+    """
+    return "$" not in pw
 
 
 def main() -> None:
