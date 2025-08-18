@@ -1,0 +1,24 @@
+<!doctype html>
+<title>Email Request</title>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+<h2>Quote ID: {{ quote.quote_id }}</h2>
+<form method="post">
+  <label>Shipper Name <input type="text" name="shipper_name"></label><br>
+  <label>Shipper Address <input type="text" name="shipper_address"></label><br>
+  <label>Shipper Contact <input type="text" name="shipper_contact"></label><br>
+  <label>Shipper Phone <input type="text" name="shipper_phone"></label><br>
+  <label>Consignee Name <input type="text" name="consignee_name"></label><br>
+  <label>Consignee Address <input type="text" name="consignee_address"></label><br>
+  <label>Consignee Contact <input type="text" name="consignee_contact"></label><br>
+  <label>Consignee Phone <input type="text" name="consignee_phone"></label><br>
+  <label>Total Weight <input type="number" step="0.01" name="total_weight"></label><br>
+  <label>Special Instructions <textarea name="special_instructions"></textarea></label><br>
+  <button type="submit">Submit</button>
+</form>
+<a href="{{ url_for('quote.quote') }}">Back to Quote</a>
