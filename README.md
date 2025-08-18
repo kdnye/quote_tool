@@ -62,8 +62,17 @@ Place the following in your project root:
   # Required for mileage lookups
   GOOGLE_MAPS_API_KEY=your_api_key_here
 
-  # Optional overrides
-  DATABASE_URL=sqlite:///app.db
+  # Database configuration
+  # Option A: full connection URL
+  # DATABASE_URL=mysql+pymysql://user:password@host:3306/quote_tool
+
+  # Option B: individual MySQL settings
+  # MYSQL_HOST=localhost
+  # MYSQL_PORT=3306
+  # MYSQL_USER=user
+  # MYSQL_PASSWORD=password
+  # MYSQL_DATABASE=quote_tool
+
   SECRET_KEY=dev-secret-key
   WORKBOOK_PATH=HotShot Quote.xlsx
   ```
