@@ -1,7 +1,9 @@
 import sqlite3
 import uuid
+from config import Config
+from sqlalchemy.engine.url import make_url
 
-DB_PATH = "app.db"
+db_path = make_url(Config.DATABASE_URL).database
 
 def column_exists(cursor, table, column):
     cursor.execute(f"PRAGMA table_info({table})")
@@ -9,7 +11,7 @@ def column_exists(cursor, table, column):
     return column in columns
 
 def run_migration():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # 1. Add `quote_id` if missing

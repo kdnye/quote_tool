@@ -7,6 +7,7 @@ import csv
 from io import StringIO
 import pandas as pd
 import streamlit.components.v1 as components
+from config import Config
 
 
 # Workbook helpers & Air math
@@ -75,7 +76,7 @@ def _accessorial_prices(selected_names):
     names = [n for n in (selected_names or []) if "guarantee" not in str(n).lower()]
 
     try:
-        wb = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+        wb = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
         if normalize_workbook:
             wb = normalize_workbook(wb)
         df = wb["Accessorials"]
@@ -271,7 +272,7 @@ def email_form_ui():
         pre_air_total = None
         try:
             if calculate_air_quote is not None:
-                wb = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+                wb = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
                 if normalize_workbook:
                     wb = normalize_workbook(wb)
                 pre = calculate_air_quote(

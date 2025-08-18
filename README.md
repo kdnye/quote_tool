@@ -56,11 +56,20 @@ Key packages: `streamlit`, `sqlalchemy`, `pandas`, `openpyxl`, `werkzeug`, `requ
 Place the following in your project root:
 
 * `HotShot Quote.xlsx` — contains rate tables and accessorials
-* `.env` file with your Google Maps API key:
+* `.env` file with configuration values:
 
   ```
+  # Required for mileage lookups
   GOOGLE_MAPS_API_KEY=your_api_key_here
+
+  # Optional overrides
+  DATABASE_URL=sqlite:///app.db
+  SECRET_KEY=dev-secret-key
+  WORKBOOK_PATH=HotShot Quote.xlsx
   ```
+
+  These variables can also be supplied at runtime via your deployment platform's
+  environment injection.
 
 ### 4. Launch the App
 

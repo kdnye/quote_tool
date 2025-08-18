@@ -4,6 +4,7 @@ from quote.ui import quote_ui
 from quote.admin_view import quote_admin_view
 from admin import admin_panel
 from quote.email_form import email_form_ui
+from config import Config
 
 st.set_page_config("Quote Tool", layout="wide")
 

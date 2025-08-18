@@ -4,9 +4,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 from sqlalchemy.sql import func
 import uuid
+from config import Config
 
-DB_PATH = "sqlite:///app.db"
-engine = create_engine(DB_PATH)
+engine = create_engine(Config.DATABASE_URL)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()

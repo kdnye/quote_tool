@@ -6,10 +6,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from werkzeug.security import generate_password_hash
 from sqlalchemy.sql import func
 import uuid
+from config import Config
 
-# === SQLite DB Path ===
-DB_PATH = "app.db"
-engine = create_engine(f"sqlite:///{DB_PATH}", echo=True)
+# === Database Path ===
+engine = create_engine(Config.DATABASE_URL, echo=True)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()

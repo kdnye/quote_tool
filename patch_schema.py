@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, inspect, text
+from config import Config
 
-engine = create_engine("sqlite:///app.db")
+engine = create_engine(Config.DATABASE_URL)
 inspector = inspect(engine)
 
 existing_columns = [col["name"] for col in inspector.get_columns("quotes")]
