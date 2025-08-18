@@ -106,20 +106,21 @@ def register():
             error = "Password does not meet requirements"
         else:
             db = Session()
-            if db.query(User).filter_by(email=email).first():
-                error = "Email already registered"
-            else:
-                user = User(
-                    name=name,
-                    email=email,
-                    password_hash=generate_password_hash(password),
-                    is_approved=True,
-                )
-                db.add(user)
-                db.commit()
+            try:
+                if db.query(User).filter_by(email=email).first():
+                    error = "Email already registered"
+                else:
+                    user = User(
+                        name=name,
+                        email=email,
+                        password_hash=generate_password_hash(password),
+                        is_approved=True,
+                    )
+                    db.add(user)
+                    db.commit()
+                    return redirect(url_for("login"))
+            finally:
                 db.close()
-                return redirect(url_for("login"))
-            db.close()
     return render_template_string(REGISTER_TEMPLATE, error=error)
 
 
