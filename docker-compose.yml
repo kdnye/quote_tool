@@ -10,4 +10,5 @@ services:
       - .:/app  # Mount all files (db, Excel, Python code)
     environment:
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
     restart: unless-stopped

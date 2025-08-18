@@ -1,18 +1,32 @@
 # db.py
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    Boolean,
+    DateTime,
+    ForeignKey,
+)
+from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session, relationship
 from datetime import datetime
-from sqlalchemy.sql import func
+import os
 import uuid
 
-DB_PATH = "sqlite:///app.db"
-engine = create_engine(DB_PATH)
+
+# Use DATABASE_URL from environment or default to local SQLite for development
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+
+# Create engine and configure session factory with scoped sessions per request
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionFactory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+Session = scoped_session(SessionFactory)
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
-session = Session()
+
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
@@ -25,11 +39,12 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     quotes = relationship("Quote", back_populates="user")
 
+
 class Quote(Base):
-    __tablename__ = 'quotes'
+    __tablename__ = "quotes"
     id = Column(Integer, primary_key=True)
     quote_id = Column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey("users.id"))
     user_email = Column(String(100))
     quote_type = Column(String(20))
     origin = Column(String(20))
@@ -47,11 +62,12 @@ class Quote(Base):
     quote_metadata = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="quotes")
-    
+
+
 class EmailQuoteRequest(Base):
-    __tablename__ = 'email_quote_requests'
+    __tablename__ = "email_quote_requests"
     id = Column(Integer, primary_key=True)
-    quote_id = Column(String(36), ForeignKey('quotes.quote_id'), nullable=False)
+    quote_id = Column(String(36), ForeignKey("quotes.quote_id"), nullable=False)
     shipper_name = Column(String)
     shipper_address = Column(String)
     shipper_contact = Column(String)
@@ -63,6 +79,3 @@ class EmailQuoteRequest(Base):
     total_weight = Column(Float)
     special_instructions = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
-Base.metadata.create_all(engine)
