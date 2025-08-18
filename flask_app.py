@@ -34,7 +34,9 @@ def is_valid_password(password: str) -> bool:
 
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "change-me"
+import os
+
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "a-more-secure-development-key")
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
