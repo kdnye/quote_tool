@@ -10,6 +10,7 @@ An internal Streamlit web app to generate logistics pricing quotes based on ZIP 
 
 * Registration, Login, Password Reset
 * Password complexity enforcement
+* Optional Flask app (`flask_app.py`) with session management via Flask-Login
 
 ### 🧑‍💼 Admin Dashboard
 

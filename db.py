@@ -4,6 +4,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 from sqlalchemy.sql import func
 import uuid
+from flask_login import UserMixin
 
 DB_PATH = "sqlite:///app.db"
 engine = create_engine(DB_PATH)
@@ -11,7 +12,7 @@ Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()
 
-class User(Base):
+class User(Base, UserMixin):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
