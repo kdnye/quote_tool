@@ -9,6 +9,7 @@ from quote.logic_hotshot import calculate_hotshot_quote
 from quote.logic_air import calculate_air_quote
 from db import Session, Quote  # NEW: persist quotes so email page can load by quote_id
 import uuid
+from config import Config
 
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
 
@@ -59,7 +60,7 @@ def quote_ui():
         st.rerun()
 
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
-    workbook = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+    workbook = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
     workbook = normalize_workbook(workbook)
     accessorials_df = workbook["Accessorials"]  # headers are the accessorial names
 

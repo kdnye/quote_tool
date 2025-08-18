@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, D
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+from config import Config
 
 # === DB Setup ===
 DB_PATH = "sqlite:///app.db"
@@ -121,7 +122,7 @@ def get_distance_miles(origin_zip, destination_zip):
 def show_quote_ui():
     st.title("📦 Quote Tool")
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
-    workbook = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+    workbook = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
     accessorials_df = workbook["Accessorials"]
     accessorials_df.columns = accessorials_df.columns.str.strip().str.upper()
 

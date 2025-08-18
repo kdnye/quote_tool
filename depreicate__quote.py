@@ -1,10 +1,11 @@
 #quote.py
-import streamlit as st  
+import streamlit as st
 import pandas as pd
 import os
 import requests
 from datetime import datetime
 from db import Session, Quote
+from config import Config
 
 def inject_fsi_theme():
     st.markdown("""
@@ -89,7 +90,7 @@ def quote_ui():
     st.image("FSI-logo.png", width=280)
     st.title("📦 Quote Tool")
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
-    workbook = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
+    workbook = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
 
     accessorials_df = workbook["Accessorials"]
     accessorials_df.columns = accessorials_df.columns.str.strip().str.upper()
