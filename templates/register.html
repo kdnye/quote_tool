@@ -1,0 +1,19 @@
+<!doctype html>
+<title>Register</title>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+<form method="post">
+  <label>Name <input type="text" name="name"></label><br>
+  <label>Email <input type="email" name="email"></label><br>
+  <label>Phone <input type="text" name="phone"></label><br>
+  <label>Business Name <input type="text" name="business_name"></label><br>
+  <label>Business Phone <input type="text" name="business_phone"></label><br>
+  <label>Password <input type="password" name="password"></label><br>
+  <button type="submit">Register</button>
+</form>
+<a href="{{ url_for('auth.login') }}">Login</a>

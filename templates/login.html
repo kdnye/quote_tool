@@ -1,0 +1,15 @@
+<!doctype html>
+<title>Login</title>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+<form method="post">
+  <label>Email <input type="email" name="email"></label><br>
+  <label>Password <input type="password" name="password"></label><br>
+  <button type="submit">Login</button>
+</form>
+<a href="{{ url_for('auth.register') }}">Register</a>

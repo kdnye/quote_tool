@@ -1,0 +1,15 @@
+<!doctype html>
+<title>Admin</title>
+<h1>Admin Dashboard</h1>
+<p>Users: {{ users|length }} | Quotes: {{ quotes|length }}</p>
+<ul>
+  {% for u in users %}
+    <li>{{ u.name }} ({{ u.email }})</li>
+  {% endfor %}
+</ul>
+<ul>
+  {% for q in quotes %}
+    <li>{{ q.quote_id }} - ${{ '%.2f'|format(q.total) }}</li>
+  {% endfor %}
+</ul>
+<a href="{{ url_for('auth.logout') }}">Logout</a>
