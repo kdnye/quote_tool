@@ -143,6 +143,26 @@ A default admin account is seeded on first run:
    * Launches a form for:
 
      * Shipper/Consignee details
-   * Triggers local email client with:
+  * Triggers local email client with:
 
      * Formatted `.csv` attachment compatible with TMS
+
+---
+
+## 🧮 Database Migrations
+
+Alembic manages schema changes.
+
+### Apply Latest Migration
+
+```bash
+alembic upgrade head
+```
+
+### Revert Last Migration
+
+```bash
+alembic downgrade -1
+```
+
+See `alembic.ini` for database connection configuration.
