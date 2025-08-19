@@ -1,7 +1,7 @@
 # Directory: quote/
 # File: ui.py
 
-import streamlit as st
+
 import pandas as pd
 from quote.theme import inject_fsi_theme
 from quote.utils import normalize_workbook
@@ -60,7 +60,7 @@ def quote_ui():
         st.rerun()
 
     quote_mode = st.radio("Select Quote Type", ["Hotshot", "Air"])
-    workbook = pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
+    workbook = pd.read_excel("HotShot Quote.xlsx", sheet_name=None)
     workbook = normalize_workbook(workbook)
     accessorials_df = workbook["Accessorials"]  # headers are the accessorial names
 
@@ -169,13 +169,7 @@ def quote_ui():
                 origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
             )
             quote_total = result["quote_total"]
-        # --- Add threshold warning ---
-        weight_threshold = 1200 if quote_mode == "Air" else 5000
-        if quote_total > 6000 or weight > weight_threshold:
-            st.warning("""🚨 **Please contact FSI directly to confirm the most correct rate for your shipment.**
-                               Phone: 800-651-0423  
-                               Email: Operations@freightservices.net""")
-            
+       
         # Persist to DB so the email page (new tab) can load via ?quote_id=...
         db = Session()
         q = Quote(
