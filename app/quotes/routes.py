@@ -42,13 +42,46 @@ def new_quote():
         quote_type = data.get("quote_type", "Hotshot")
         origin_zip = data.get("origin_zip", "")
         dest_zip = data.get("dest_zip", "")
-        weight_actual = float(data.get("weight_actual") or 0)
-        weight_dim = float(data.get("weight_dim") or 0)
+
+        errors = []
+        weight_actual_raw = data.get("weight_actual")
+        if weight_actual_raw in (None, ""):
+            errors.append("Actual weight is required and must be a number.")
+            weight_actual = 0.0
+        else:
+            try:
+                weight_actual = float(weight_actual_raw)
+                if weight_actual < 0:
+                    errors.append("Actual weight must be non-negative.")
+            except (TypeError, ValueError):
+                errors.append("Actual weight is required and must be a number.")
+                weight_actual = 0.0
+
+        weight_dim_raw = data.get("weight_dim")
+        if weight_dim_raw in (None, ""):
+            weight_dim = 0.0
+        else:
+            try:
+                weight_dim = float(weight_dim_raw)
+                if weight_dim < 0:
+                    errors.append("Dimensional weight must be non-negative.")
+            except (TypeError, ValueError):
+                errors.append("Dimensional weight must be a number.")
+                weight_dim = 0.0
+
         accessorials = data.get("accessorials") or "{}"
         try:
             accessorials_json = json.loads(accessorials) if isinstance(accessorials, str) else accessorials
         except Exception:
             accessorials_json = {}
+
+        if errors:
+            if request.is_json:
+                return jsonify({"errors": errors}), 400
+            return (
+                render_template("new_quote.html", errors=errors),
+                400,
+            )
 
         workbook = _get_normalized_workbook()
         selected = []
