@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for
+"""Admin routes providing simple user and quote management."""
+
+from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
 from services import auth as auth_service
 from services import quote as quote_service
@@ -25,3 +27,23 @@ def dashboard():
     users = auth_service.list_users()
     quotes = quote_service.list_quotes()
     return render_template("admin.html", users=users, quotes=quotes)
+
+
+@admin_bp.route("/approve/<int:user_id>", methods=["POST"])
+@admin_required
+def approve_user(user_id: int):
+    if auth_service.approve_user(user_id):
+        flash("User approved", "success")
+    else:
+        flash("User not found", "error")
+    return redirect(url_for("admin.dashboard"))
+
+
+@admin_bp.route("/delete/<int:user_id>", methods=["POST"])
+@admin_required
+def delete_user(user_id: int):
+    if auth_service.delete_user(user_id):
+        flash("User deleted", "success")
+    else:
+        flash("User not found", "error")
+    return redirect(url_for("admin.dashboard"))

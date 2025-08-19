@@ -1,3 +1,5 @@
+"""Authentication and user management services."""
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import Session, User
 
@@ -53,3 +55,35 @@ def list_users():
     users = db.query(User).all()
     db.close()
     return users
+
+
+def approve_user(user_id: int) -> bool:
+    """Mark a user account as approved.
+
+    Returns True if the user was found and updated, False otherwise.
+    """
+    db = Session()
+    user = db.get(User, user_id)
+    if not user:
+        db.close()
+        return False
+    user.is_approved = True
+    db.commit()
+    db.close()
+    return True
+
+
+def delete_user(user_id: int) -> bool:
+    """Remove a user account from the database.
+
+    Returns True if the user existed and was deleted, False otherwise.
+    """
+    db = Session()
+    user = db.get(User, user_id)
+    if not user:
+        db.close()
+        return False
+    db.delete(user)
+    db.commit()
+    db.close()
+    return True

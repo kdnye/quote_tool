@@ -1,15 +1,59 @@
 <!doctype html>
 <title>Admin</title>
 <h1>Admin Dashboard</h1>
-<p>Users: {{ users|length }} | Quotes: {{ quotes|length }}</p>
-<ul>
+
+<nav>
+  <a href="{{ url_for('quote.quote') }}">Create Quote</a> |
+  <a href="{{ url_for('auth.logout') }}">Logout</a>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <ul class="flashes">
+    {% for category, message in messages %}
+      <li class="{{ category }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{% endwith %}
+
+<h2>Users ({{ users|length }})</h2>
+<table border="1" cellpadding="4">
+  <tr>
+    <th>Name</th><th>Email</th><th>Approved</th><th>Actions</th>
+  </tr>
   {% for u in users %}
-    <li>{{ u.name }} ({{ u.email }})</li>
+  <tr>
+    <td>{{ u.name }}</td>
+    <td>{{ u.email }}</td>
+    <td>{{ 'Yes' if u.is_approved else 'No' }}</td>
+    <td>
+      {% if not u.is_approved %}
+      <form method="post" action="{{ url_for('admin.approve_user', user_id=u.id) }}" style="display:inline">
+        <button type="submit">Approve</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" style="display:inline">
+        <button type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>
   {% endfor %}
-</ul>
-<ul>
+</table>
+
+<h2>Quotes ({{ quotes|length }})</h2>
+<table border="1" cellpadding="4">
+  <tr>
+    <th>ID</th><th>User Email</th><th>Type</th><th>Origin</th><th>Destination</th><th>Total</th>
+  </tr>
   {% for q in quotes %}
-    <li>{{ q.quote_id }} - ${{ '%.2f'|format(q.total) }}</li>
+  <tr>
+    <td>{{ q.quote_id }}</td>
+    <td>{{ q.user_email }}</td>
+    <td>{{ q.quote_type }}</td>
+    <td>{{ q.origin }}</td>
+    <td>{{ q.destination }}</td>
+    <td>${{ '%.2f'|format(q.total) }}</td>
+  </tr>
   {% endfor %}
-</ul>
-<a href="{{ url_for('auth.logout') }}">Logout</a>
+</table>

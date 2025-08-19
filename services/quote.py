@@ -48,8 +48,9 @@ def get_quote(quote_id: str):
 
 
 def list_quotes():
+    """Return all quotes ordered from newest to oldest."""
     db = Session()
-    quotes = db.query(Quote).all()
+    quotes = db.query(Quote).order_by(Quote.created_at.desc()).all()
     db.close()
     return quotes
 
