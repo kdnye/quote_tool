@@ -65,6 +65,17 @@ For production:
 gunicorn flask_app:app
 ```
 
+### Standalone API
+
+If you only need a lightweight JSON API, run the standalone server:
+
+```bash
+python standalone_flask_app.py
+```
+
+This exposes `POST /api/quote` for generating quotes and
+`GET /api/quote/<quote_id>` for retrieving previously created quotes.
+
 ---
 
 ## 🔧 Admin Access
