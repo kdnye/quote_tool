@@ -12,11 +12,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from flask_login import UserMixin
 from datetime import datetime
-from sqlalchemy.sql import func
 import uuid
 from config import Config
 
-engine = create_engine(Config.DATABASE_URL)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()
