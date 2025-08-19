@@ -1,62 +1,138 @@
-# admin.py
-import streamlit as st
-from db import Session, User
+# admin_api.py  (Flask refactor of admin.py)
+from flask import Blueprint, request, jsonify, session, render_template
 from sqlalchemy import text
-import pandas as pd
+from db import Session, User
 
-def load_users():
+bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+# ---- Auth guards (reuse your own if you already have them) ----
+from functools import wraps
+
+def login_required_json(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"ok": False, "error": "Authentication required."}), 401
+        return f(*args, **kwargs)
+    return wrap
+
+def admin_required_json(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"ok": False, "error": "Authentication required."}), 401
+        if session.get("role") != "admin":
+            return jsonify({"ok": False, "error": "Admin role required."}), 403
+        return f(*args, **kwargs)
+    return wrap
+
+
+# ---- Helpers ----
+def _user_to_dict(u: User):
+    return {
+        "id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "phone": u.phone,
+        "business": u.business_name,
+        "role": u.role,
+        "approved": bool(u.is_approved),
+        "created": u.created_at.strftime("%Y-%m-%d") if getattr(u, "created_at", None) else None,
+    }
+
+
+# ---- Endpoints ----
+
+@bp.get("/users")
+@admin_required_json
+def list_users():
+    """GET /admin/users  -> all users"""
     db = Session()
-    users = db.query(User).all()
-    db.close()
-    return pd.DataFrame([{
-        "ID": u.id,
-        "Name": u.name,
-        "Email": u.email,
-        "Phone": u.phone,
-        "Business": u.business_name,
-        "Role": u.role,
-        "Approved": u.is_approved,
-        "Created": u.created_at.strftime("%Y-%m-%d")
-    } for u in users])
-
-def admin_panel():
-    st.title("🛠️ Admin Panel")
-    users_df = load_users()
-
-    st.subheader("📋 All Users")
-    st.dataframe(users_df)
-
-    st.subheader("✅ Approve Users")
-    pending = users_df[~users_df["Approved"]]
-    if not pending.empty:
-        uid = st.selectbox("Select user to approve", pending["ID"].tolist(), key="approve_user")
-        if st.button("Approve"):
-            db = Session()
-            db.execute(text("UPDATE users SET is_approved = 1 WHERE id = :id"), {"id": uid})
-            db.commit()
-            db.close()
-            st.success(f"User {uid} approved.")
-            st.rerun()
-    else:
-        st.info("No pending users.")
-
-    st.subheader("🔄 Change Roles")
-    uid = st.selectbox("User ID", users_df["ID"].tolist(), key="change_user")
-    new_role = st.selectbox("Role", ["user", "admin"], key="new_role")
-    if st.button("Update Role"):
-        db = Session()
-        db.execute(text("UPDATE users SET role = :role WHERE id = :id"), {"role": new_role, "id": uid})
-        db.commit()
+    try:
+        users = db.query(User).all()
+        return jsonify({"ok": True, "users": [_user_to_dict(u) for u in users]})
+    finally:
         db.close()
-        st.success(f"User {uid} role set to {new_role}.")
-        st.rerun()
 
-    st.subheader("🗑️ Delete User")
-    uid_del = st.selectbox("Select user to delete", users_df["ID"].tolist(), key="delete_user")
-    if st.button("Delete"):
-        db = Session()
-        db.execute(text("DELETE FROM users WHERE id = :id"), {"id": uid_del})
-        db.commit()
+
+@bp.get("/users/pending")
+@admin_required_json
+def list_pending_users():
+    """GET /admin/users/pending  -> users where is_approved = 0/False"""
+    db = Session()
+    try:
+        pending = db.query(User).filter(User.is_approved == False).all()  # noqa: E712
+        return jsonify({"ok": True, "users": [_user_to_dict(u) for u in pending]})
+    finally:
         db.close()
-        st.warning(f"User {uid_del} deleted.")
-        st.rerun()
+
+
+@bp.post("/users/approve")
+@admin_required_json
+def approve_user():
+    """POST /admin/users/approve  { "id": 123 }"""
+    data = request.get_json(silent=True) or {}
+    uid = data.get("id")
+    if not uid:
+        return jsonify({"ok": False, "error": "Missing 'id'."}), 400
+
+    db = Session()
+    try:
+        # ORM update (prefer over raw SQL)
+        user = db.query(User).get(uid)
+        if not user:
+            return jsonify({"ok": False, "error": "User not found."}), 404
+        user.is_approved = True
+        db.commit()
+        return jsonify({"ok": True, "message": f"User {uid} approved."})
+    finally:
+        db.close()
+
+
+@bp.post("/users/role")
+@admin_required_json
+def change_role():
+    """POST /admin/users/role  { "id": 123, "role": "user|admin" }"""
+    data = request.get_json(silent=True) or {}
+    uid = data.get("id")
+    new_role = (data.get("role") or "").strip().lower()
+    if not uid or new_role not in {"user", "admin"}:
+        return jsonify({"ok": False, "error": "Provide valid 'id' and 'role' (user|admin)."}), 400
+
+    db = Session()
+    try:
+        user = db.query(User).get(uid)
+        if not user:
+            return jsonify({"ok": False, "error": "User not found."}), 404
+        user.role = new_role
+        db.commit()
+        return jsonify({"ok": True, "message": f"User {uid} role set to {new_role}."})
+    finally:
+        db.close()
+
+
+@bp.delete("/users/<int:uid>")
+@admin_required_json
+def delete_user(uid: int):
+    """DELETE /admin/users/<uid>"""
+    db = Session()
+    try:
+        user = db.query(User).get(uid)
+        if not user:
+            return jsonify({"ok": False, "error": "User not found."}), 404
+        db.delete(user)
+        db.commit()
+        return jsonify({"ok": True, "message": f"User {uid} deleted."})
+    finally:
+        db.close()
+
+
+# ---- Optional: minimal HTML admin page (table + fetch actions) ----
+@bp.get("/")
+@admin_required_json
+def admin_page():
+    """
+    Simple server-rendered view.
+    Replace/extend with your frontend or an SPA as needed.
+    """
+    return render_template("admin.html")  # see example template below
