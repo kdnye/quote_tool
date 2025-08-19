@@ -31,6 +31,10 @@ def calculate_hotshot_quote(origin, destination, weight, accessorial_total, rate
             zone = row[col_map['ZONE']]
             break
 
+    zone_col = rates_df[col_map['ZONE']].astype(str).str.upper()
+    if str(zone).upper() not in zone_col.values:
+        raise ValueError(f"Zone '{zone}' not found in the Hotshot Rates sheet.")
+
     is_zone_x = zone.upper() == "X"
     
     # Use the mapped column names to access data

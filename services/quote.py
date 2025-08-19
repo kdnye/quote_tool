@@ -94,9 +94,12 @@ def create_quote(
     if quote_type == "Air":
         result = calculate_air_quote(origin, destination, billable_weight, subtotal, workbook)
     else:
-        result = calculate_hotshot_quote(
-            origin, destination, billable_weight, subtotal, workbook["Hotshot Rates"]
-        )
+        try:
+            result = calculate_hotshot_quote(
+                origin, destination, billable_weight, subtotal, workbook["Hotshot Rates"]
+            )
+        except ValueError as e:
+            raise ValueError(f"Hotshot quote calculation failed: {e}")
 
     quote_total = result["quote_total"]
     if quote_type == "Air" and guarantee_selected:

@@ -165,10 +165,14 @@ def quote_ui():
                 # Apply Guarantee last (25% multiplier)
                 quote_total *= 1.25
         else:
-            result = calculate_hotshot_quote(
-                origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
-            )
-            quote_total = result["quote_total"]
+            try:
+                result = calculate_hotshot_quote(
+                    origin, destination, weight, accessorial_total, workbook["Hotshot Rates"]
+                )
+                quote_total = result["quote_total"]
+            except ValueError as e:
+                st.error(str(e))
+                return
        
         # Persist to DB so the email page (new tab) can load via ?quote_id=...
         db = Session()

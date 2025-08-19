@@ -42,20 +42,26 @@ def new_quote():
                 acc_df, selected, quote_type, weight_actual
             )
 
+        warnings = []
+
         if quote_type.lower() == "air":
             result = calculate_air_quote(
                 origin_zip, dest_zip, weight_actual, accessorial_total, workbook
             )
         else:
-            result = calculate_hotshot_quote(
-                origin_zip,
-                dest_zip,
-                weight_actual,
-                accessorial_total,
-                workbook.get("Hotshot Rates"),
-            )
+            try:
+                result = calculate_hotshot_quote(
+                    origin_zip,
+                    dest_zip,
+                    weight_actual,
+                    accessorial_total,
+                    workbook.get("Hotshot Rates"),
+                )
+            except ValueError as e:
+                warnings.append(str(e))
+                result = {"quote_total": 0.0}
+
         price = result.get("quote_total", 0.0)
-        warnings = []
 
         q = Quote(
             quote_type=quote_type.title(),
