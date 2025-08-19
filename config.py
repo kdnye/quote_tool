@@ -7,6 +7,7 @@ class Config:
         os.getenv("DATABASE_URL") or  # e.g. mysql+pymysql://user:pass@host/db
         "sqlite:///app.db"
     )
+    DATABASE_URL = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WORKBOOK_PATH = os.getenv("WORKBOOK_PATH", "HotShot Quote.xlsx")
     GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")

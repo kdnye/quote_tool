@@ -10,10 +10,12 @@ def admin_required():
 
 @admin_bp.before_request
 def guard_admin():
-    # allow login page redirect without flicker
     from flask import abort
-    if request.endpoint and request.endpoint.startswith("admin.") and not admin_required():
-        abort(403)
+    if request.endpoint and request.endpoint.startswith("admin."):
+        if not current_user.is_authenticated:
+            return redirect(url_for("auth.login"))
+        if not current_user.is_admin:
+            abort(403)
 
 @admin_bp.route("/")
 def dashboard():
@@ -21,6 +23,7 @@ def dashboard():
     return render_template("admin_dashboard.html", users=users)
 
 @admin_bp.route("/toggle/<int:user_id>", methods=["POST"])
+@login_required
 def toggle_active(user_id):
     user = User.query.get_or_404(user_id)
     user.is_active = not user.is_active
@@ -29,6 +32,7 @@ def toggle_active(user_id):
     return redirect(url_for("admin.dashboard"))
 
 @admin_bp.route("/promote/<int:user_id>", methods=["POST"])
+@login_required
 def promote(user_id):
     user = User.query.get_or_404(user_id)
     user.is_admin = True
