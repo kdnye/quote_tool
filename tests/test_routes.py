@@ -106,3 +106,41 @@ def test_quote_creation(app, client, monkeypatch):
 
     with app.app_context():
         assert Quote.query.count() == 1
+
+
+def test_new_quote_invalid_weight_non_numeric(app, client):
+    seed_user(app)
+    login(client)
+
+    response = client.post(
+        "/quotes/new",
+        json={
+            "quote_type": "Hotshot",
+            "origin_zip": "12345",
+            "dest_zip": "67890",
+            "weight_actual": "abc",
+        },
+    )
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "Actual weight is required and must be a number." in data["errors"]
+
+
+def test_new_quote_invalid_weight_negative(app, client):
+    seed_user(app)
+    login(client)
+
+    response = client.post(
+        "/quotes/new",
+        json={
+            "quote_type": "Hotshot",
+            "origin_zip": "12345",
+            "dest_zip": "67890",
+            "weight_actual": -5,
+        },
+    )
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "Actual weight must be non-negative." in data["errors"]
