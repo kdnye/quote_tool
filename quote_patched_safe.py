@@ -1,69 +1,75 @@
-
-import streamlit as st
-import pandas as pd
 import os
-import requests
-import smtplib
-from email.mime.text import MIMEText
-from datetime import datetime
-from db import Session, Quote
-from io import BytesIO
-import folium
-from geopy.geocoders import Nominatim
-from streamlit_folium import st_folium
+"index.html",
+origin_zip=origin_zip,
+destination_zip=dest_zip,
+email=email,
+miles=miles,
+)
 
-def get_distance_miles(origin_zip, destination_zip):
-    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
-    if not api_key:
-        return None
-    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin_zip}&destination={destination_zip}&mode=driving&key={api_key}"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        if data["status"] == "OK":
-            meters = data["routes"][0]["legs"][0]["distance"]["value"]
-            return meters / 1609.344
-    except:
-        return None
 
-def send_quote_email(to_email, subject, body):
-    smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
+# GET
+return render_template("index.html")
 
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = smtp_user
-    msg['To'] = to_email
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
 
-def show_map(origin_zip, destination_zip):
-    geolocator = Nominatim(user_agent="quote_tool")
-    origin_loc = geolocator.geocode(origin_zip)
-    dest_loc = geolocator.geocode(destination_zip)
 
-    if not origin_loc or not dest_loc:
-        st.warning("Could not locate one or both zip codes.")
-        return
+@app.route("/map", methods=["POST"]) # invoked from the index form
+def map_view():
+origin_zip = (request.form.get("origin_zip") or "").strip()
+dest_zip = (request.form.get("destination_zip") or "").strip()
 
-    mid_lat = (origin_loc.latitude + dest_loc.latitude) / 2
-    mid_lon = (origin_loc.longitude + dest_loc.longitude) / 2
 
-    m = folium.Map(location=[mid_lat, mid_lon], zoom_start=6)
+html = build_map_html(origin_zip, dest_zip)
+if html is None:
+flash("Could not locate one or both ZIP codes.", "warning")
+return redirect(url_for("index"))
 
-    folium.Marker([origin_loc.latitude, origin_loc.longitude],
-                  popup=f"Origin: {origin_zip}", icon=folium.Icon(color='green')).add_to(m)
 
-    folium.Marker([dest_loc.latitude, dest_loc.longitude],
-                  popup=f"Destination: {destination_zip}", icon=folium.Icon(color='red')).add_to(m)
+# Wrap in Markup so Jinja doesn't escape it
+return render_template("map.html", map_html=Markup(html))
 
-    folium.PolyLine([(origin_loc.latitude, origin_loc.longitude),
-                     (dest_loc.latitude, dest_loc.longitude)],
-                    color="blue", weight=3, opacity=0.8).add_to(m)
 
-    st_folium(m, width=700, height=500)
+
+
+@app.route("/send", methods=["POST"]) # send quote email
+def send_email_route():
+origin_zip = (request.form.get("origin_zip") or "").strip()
+dest_zip = (request.form.get("destination_zip") or "").strip()
+email = (request.form.get("email") or "").strip()
+
+
+if not email:
+flash("Recipient email is required to send a quote.", "warning")
+return redirect(url_for("index"))
+
+
+miles = get_distance_miles(origin_zip, dest_zip)
+miles_text = f"{miles:,.2f} miles" if miles is not None else "N/A"
+
+
+subject = f"Quote for {origin_zip} → {dest_zip}"
+body = (
+f"Quote Details\n\n"
+f"Origin ZIP: {origin_zip}\n"
+f"Destination ZIP: {dest_zip}\n"
+f"Estimated Distance: {miles_text}\n"
+f"Generated: {datetime.utcnow().isoformat()}Z\n"
+)
+
+
+try:
+send_quote_email(email, subject, body)
+flash("Quote email sent.", "success")
+except Exception as e:
+app.logger.exception("Email send failed: %s", e)
+flash("Failed to send email. Check SMTP settings.", "danger")
+
+
+return redirect(url_for("index"))
+
+
+
+
+if __name__ == "__main__":
+# For local dev only; use a WSGI/ASGI server in production
+app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
