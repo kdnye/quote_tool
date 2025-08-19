@@ -51,9 +51,19 @@ def get_accessorial_options(quote_type: str) -> list[str]:
     return options
 
 
+_WORKBOOK_CACHE = None
+
+
 def _load_workbook():
-    wb = pd.read_excel(BOOK_PATH, sheet_name=None)
-    return normalize_workbook(wb)
+    global _WORKBOOK_CACHE
+    if _WORKBOOK_CACHE is not None:
+        return _WORKBOOK_CACHE
+    try:
+        wb = pd.read_excel(BOOK_PATH, sheet_name=None)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load workbook '{BOOK_PATH}': {e}") from e
+    _WORKBOOK_CACHE = normalize_workbook(wb)
+    return _WORKBOOK_CACHE
 
 
 def create_quote(
