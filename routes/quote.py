@@ -42,4 +42,5 @@ def email_request(quote_id):
         quote_service.create_email_request(quote_id, request.form)
         flash("Request submitted")
         return redirect(url_for("quote.quote"))
-    return render_template("email_request.html", quote=quote)
+    context = quote_service.build_email_context(quote)
+    return render_template("email_request.html", quote=quote, **context)
