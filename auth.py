@@ -1,5 +1,5 @@
 # auth.py (Flask version)
-from flask import Blueprint, request, jsonify, session, current_app
+from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 
@@ -11,6 +11,7 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 # Helpers
 # -----------------------
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
 
 def is_valid_password(password: str) -> bool:
     """≥14 chars with upper/lower/number/symbol OR ≥24 chars letters-only (passphrase)."""
@@ -26,21 +27,31 @@ def is_valid_password(password: str) -> bool:
         return True
     return False
 
+
 def _json_required(keys):
     data = request.get_json(silent=True) or {}
-    missing = [k for k in keys if k not in data or (isinstance(data[k], str) and not data[k].strip())]
+    missing = [
+        k
+        for k in keys
+        if k not in data or (isinstance(data[k], str) and not data[k].strip())
+    ]
     return data, missing
+
 
 # -----------------------
 # Routes
 # -----------------------
+
 
 @bp.post("/login")
 def login():
     """POST /auth/login  -> {email, password}"""
     data, missing = _json_required(["email", "password"])
     if missing:
-        return jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
+        return (
+            jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}),
+            400,
+        )
 
     email = data["email"].strip().lower()
     password = data["password"]
@@ -51,7 +62,9 @@ def login():
     db = Session()
     try:
         user = db.query(User).filter_by(email=email).first()
-        if not user or not check_password_hash(getattr(user, "password_hash", ""), password):
+        if not user or not check_password_hash(
+            getattr(user, "password_hash", ""), password
+        ):
             return jsonify({"ok": False, "error": "Invalid credentials."}), 401
 
         if not getattr(user, "is_approved", True):
@@ -66,7 +79,9 @@ def login():
 
         # mimic your Streamlit redirect rule
         landing = "admin" if session["role"] == "admin" else "quote"
-        return jsonify({"ok": True, "message": f"Welcome {user.name}!", "landing": landing})
+        return jsonify(
+            {"ok": True, "message": f"Welcome {user.name}!", "landing": landing}
+        )
     finally:
         db.close()
 
@@ -77,7 +92,10 @@ def register():
     req_fields = ["name", "email", "password", "confirm"]
     data, missing = _json_required(req_fields)
     if missing:
-        return jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
+        return (
+            jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}),
+            400,
+        )
 
     name = data["name"].strip()
     email = data["email"].strip().lower()
@@ -92,7 +110,15 @@ def register():
     if password != confirm:
         return jsonify({"ok": False, "error": "Passwords do not match."}), 400
     if not is_valid_password(password):
-        return jsonify({"ok": False, "error": "Password must be ≥14 chars with upper/lower/number/symbol OR a 24+ char passphrase (letters only)."}), 400
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "Password must be ≥14 chars with upper/lower/number/symbol OR a 24+ char passphrase (letters only).",
+                }
+            ),
+            400,
+        )
 
     db = Session()
     try:
@@ -110,7 +136,12 @@ def register():
         )
         db.add(new_user)
         db.commit()
-        return jsonify({"ok": True, "message": "Registration successful. You can now log in."}), 201
+        return (
+            jsonify(
+                {"ok": True, "message": "Registration successful. You can now log in."}
+            ),
+            201,
+        )
     finally:
         db.close()
 
@@ -120,7 +151,10 @@ def reset_password():
     """POST /auth/reset-password -> {email, new_password, confirm_password}"""
     data, missing = _json_required(["email", "new_password", "confirm_password"])
     if missing:
-        return jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
+        return (
+            jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}),
+            400,
+        )
 
     email = data["email"].strip().lower()
     new_password = data["new_password"]
@@ -131,13 +165,21 @@ def reset_password():
     if new_password != confirm_password:
         return jsonify({"ok": False, "error": "Passwords do not match."}), 400
     if not is_valid_password(new_password):
-        return jsonify({"ok": False, "error": "Password must meet complexity requirements."}), 400
+        return (
+            jsonify(
+                {"ok": False, "error": "Password must meet complexity requirements."}
+            ),
+            400,
+        )
 
     db = Session()
     try:
         user = db.query(User).filter_by(email=email).first()
         if not user:
-            return jsonify({"ok": False, "error": "No user found with that email."}), 404
+            return (
+                jsonify({"ok": False, "error": "No user found with that email."}),
+                404,
+            )
 
         user.password_hash = generate_password_hash(new_password)
         db.commit()
@@ -157,10 +199,13 @@ def logout():
 # (Optional) Guard decorator you can use on protected routes
 # -----------------------
 from functools import wraps
+
+
 def login_required_json(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return jsonify({"ok": False, "error": "Authentication required."}), 401
         return f(*args, **kwargs)
+
     return wrapper
