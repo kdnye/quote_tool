@@ -1,5 +1,8 @@
 #auth.py
-import streamlit as st
+try:
+    import streamlit as st
+except ModuleNotFoundError:  # pragma: no cover - streamlit not required for tests
+    st = None
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 from db import Session, User
@@ -12,6 +15,8 @@ def is_valid_password(password):
     return False
 
 def login_ui():
+    if st is None:
+        raise RuntimeError("Streamlit is required for the legacy UI.")
     st.subheader("🔑 Admin Login")
     email = st.text_input("Email", key="login_email")
     password = st.text_input("Password", type="password", key="login_password")
@@ -37,6 +42,8 @@ def login_ui():
 
 
 def register_ui():
+    if st is None:
+        raise RuntimeError("Streamlit is required for the legacy UI.")
     st.subheader("📝 Register")
     with st.form("register_form"):
         name = st.text_input("Full Name")
@@ -73,6 +80,8 @@ def register_ui():
             db.close()
 
 def reset_password_ui():
+    if st is None:
+        raise RuntimeError("Streamlit is required for the legacy UI.")
     st.subheader("🔁 Reset Password")
     with st.form("reset_form"):
         email = st.text_input("Email")
