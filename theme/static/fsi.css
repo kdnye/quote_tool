@@ -1,0 +1,48 @@
+/* theme/static/fsi.css */
+:root {
+  --fsi-bg: #a0a0a0;
+  --fsi-text: #ffffff;
+  --fsi-btn: #005B99;
+  --fsi-btn-hover: #003366;
+}
+
+html, body {
+  background-color: var(--fsi-bg);
+  color: var(--fsi-text);
+}
+
+/* General app container if you use one */
+.app-shell {
+  background-color: var(--fsi-bg);
+  color: var(--fsi-text);
+}
+
+/* Buttons */
+button, .btn {
+  background-color: var(--fsi-btn);
+  color: #fff;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+button:hover, .btn:hover {
+  background-color: var(--fsi-btn-hover);
+}
+
+/* Form labels and common widgets */
+label, .form-label {
+  color: var(--fsi-text);
+  font-weight: 500;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--fsi-text);
+}
+
+/* Utility if you want radio/checkbox/text inputs in white text */
+.radio-group, .checkbox-group, .text-input {
+  color: var(--fsi-text);
+}
