@@ -29,20 +29,49 @@ def calculate_air_quote(origin, destination, weight, accessorial_total, workbook
     # Convert the ZIPCODE column to a string for a proper comparison
     zip_zone_df[col_map['ZIPCODE']] = zip_zone_df[col_map['ZIPCODE']].astype(str).str.strip()
 
-    orig_zone = int(zip_zone_df[zip_zone_df[col_map['ZIPCODE']] == origin][col_map['DEST ZONE']].values[0])
-    dest_zone = int(zip_zone_df[zip_zone_df[col_map['ZIPCODE']] == destination][col_map['DEST ZONE']].values[0])
+    def _error_result(msg):
+        return {
+            "zone": None,
+            "quote_total": 0,
+            "min_charge": None,
+            "per_lb": None,
+            "weight_break": None,
+            "origin_beyond": None,
+            "dest_beyond": None,
+            "origin_charge": 0,
+            "dest_charge": 0,
+            "beyond_total": 0,
+            "error": msg,
+        }
+
+    origin_row = zip_zone_df[zip_zone_df[col_map['ZIPCODE']] == str(origin)]
+    if origin_row.empty:
+        return _error_result(f"Origin ZIP code {origin} not found")
+
+    dest_row = zip_zone_df[zip_zone_df[col_map['ZIPCODE']] == str(destination)]
+    if dest_row.empty:
+        return _error_result(f"Destination ZIP code {destination} not found")
+
+    orig_zone = int(origin_row[col_map['DEST ZONE']].values[0])
+    dest_zone = int(dest_row[col_map['DEST ZONE']].values[0])
     concat = int(f"{orig_zone}{dest_zone}")
     
     # Corrected: Use the dynamically found column name for 'CONCATENATE'
     cost_zone_table[col_map['CONCATENATE']] = pd.to_numeric(cost_zone_table[col_map['CONCATENATE']], errors='coerce').astype(str)
     
     # Corrected: Use the dynamically found column name for 'COST ZONE'
-    cost_zone = cost_zone_table[cost_zone_table[col_map['CONCATENATE']] == str(concat)][col_map['COST ZONE']].values[0]
+    cost_zone_match = cost_zone_table[cost_zone_table[col_map['CONCATENATE']] == str(concat)][col_map['COST ZONE']]
+    if cost_zone_match.empty:
+        return _error_result(f"Cost zone not found for concatenated zone {concat}")
+    cost_zone = cost_zone_match.values[0]
     
     # Corrected: Use the dynamically found column name for the ZONE column in the 'Air Cost Zone' sheet
     air_cost_df[col_map['AIR COST ZONE']] = air_cost_df[col_map['AIR COST ZONE']].astype(str)
     
-    cost_row = air_cost_df[air_cost_df[col_map['AIR COST ZONE']].str.strip() == str(cost_zone).strip()].iloc[0]
+    cost_row_match = air_cost_df[air_cost_df[col_map['AIR COST ZONE']].str.strip() == str(cost_zone).strip()]
+    if cost_row_match.empty:
+        return _error_result(f"Air cost zone {cost_zone} not found")
+    cost_row = cost_row_match.iloc[0]
 
     min_charge = float(cost_row[col_map['MIN']])
     per_lb = float(str(cost_row[col_map['PER LB']]).replace("$", "").replace(",", ""))
@@ -95,5 +124,6 @@ def calculate_air_quote(origin, destination, weight, accessorial_total, workbook
         "dest_beyond": dest_beyond,
         "origin_charge": origin_charge,
         "dest_charge": dest_charge,
-        "beyond_total": beyond_total
+        "beyond_total": beyond_total,
+        "error": None,
     }
