@@ -55,3 +55,61 @@ def test_calculate_air_quote():
     assert result['beyond_total'] == 20
     # Base 110 + beyond 20 + accessorial 10 = 140
     assert result['quote_total'] == pytest.approx(140.0)
+
+
+def test_calculate_air_quote_missing_zip():
+    workbook = {
+        'ZIP CODE ZONES': pd.DataFrame({
+            'ZIPCODE': ['67890'],
+            'DEST ZONE': [2],
+            'BEYOND': ['B1'],
+        }),
+        'COST ZONE TABLE': pd.DataFrame({
+            'CONCATENATE': ['12'],
+            'COST ZONE': ['C1'],
+        }),
+        'Air Cost Zone': pd.DataFrame({
+            'ZONE': ['C1'],
+            'MIN': [100],
+            'PER LB': ['$1.00'],
+            'WEIGHT BREAK': [50],
+        }),
+        'Beyond Price': pd.DataFrame({
+            'ZONE': ['B1'],
+            'RATE': ['$20'],
+        }),
+    }
+
+    result = calculate_air_quote('12345', '67890', 60, 10, workbook)
+
+    assert result['quote_total'] == 0
+    assert 'error' in result and 'Origin ZIP code 12345 not found' in result['error']
+
+
+def test_calculate_air_quote_missing_destination():
+    workbook = {
+        'ZIP CODE ZONES': pd.DataFrame({
+            'ZIPCODE': ['12345'],
+            'DEST ZONE': [1],
+            'BEYOND': ['NO'],
+        }),
+        'COST ZONE TABLE': pd.DataFrame({
+            'CONCATENATE': ['11'],
+            'COST ZONE': ['C1'],
+        }),
+        'Air Cost Zone': pd.DataFrame({
+            'ZONE': ['C1'],
+            'MIN': [100],
+            'PER LB': ['$1.00'],
+            'WEIGHT BREAK': [50],
+        }),
+        'Beyond Price': pd.DataFrame({
+            'ZONE': ['B1'],
+            'RATE': ['$20'],
+        }),
+    }
+
+    result = calculate_air_quote('12345', '67890', 60, 10, workbook)
+
+    assert result['quote_total'] == 0
+    assert 'error' in result and 'Destination ZIP code 67890 not found' in result['error']
