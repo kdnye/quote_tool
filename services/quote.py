@@ -1,10 +1,11 @@
 import pandas as pd
+from typing import Optional
+from config import Config
 from db import Session, Quote, EmailQuoteRequest
 from quote.utils import normalize_workbook
 from quote.logic_hotshot import calculate_hotshot_quote
 from quote.logic_air import calculate_air_quote
 
-BOOK_PATH = "HotShot Quote.xlsx"
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
 
 
@@ -51,8 +52,9 @@ def get_accessorial_options(quote_type: str) -> list[str]:
     return options
 
 
-def _load_workbook():
-    wb = pd.read_excel(BOOK_PATH, sheet_name=None)
+def _load_workbook(path: Optional[str] = None):
+    wb_path = path or Config.WORKBOOK_PATH
+    wb = pd.read_excel(wb_path, sheet_name=None)
     return normalize_workbook(wb)
 
 

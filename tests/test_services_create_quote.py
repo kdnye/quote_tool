@@ -48,7 +48,7 @@ def test_create_quote_hotshot(monkeypatch, user):
         )
     }
 
-    monkeypatch.setattr(quote_service, "_load_workbook", lambda: workbook)
+    monkeypatch.setattr(quote_service, "_load_workbook", lambda path=None: workbook)
     monkeypatch.setattr("quote.logic_hotshot.get_distance_miles", lambda o, d: 150)
 
     q = quote_service.create_quote(
@@ -96,7 +96,7 @@ def test_create_quote_air(monkeypatch, user):
         ),
     }
 
-    monkeypatch.setattr(quote_service, "_load_workbook", lambda: workbook)
+    monkeypatch.setattr(quote_service, "_load_workbook", lambda path=None: workbook)
 
     q = quote_service.create_quote(
         user.id,
