@@ -10,11 +10,13 @@ from jinja2 import DictLoader
 from werkzeug.security import generate_password_hash
 
 # Import your existing helpers and models
-from db import Session, User
+from db import Session, User, PasswordResetToken
 from werkzeug.security import check_password_hash
 
 # ---- Reuse/keep your helper functions (optional import from a helpers module) ----
 import re
+import secrets
+from datetime import datetime, timedelta
 
 def is_valid_password(password: str) -> bool:
     if len(password) >= 14 and re.search(r"[A-Z]", password) and re.search(r"[a-z]", password) and re.search(r"[0-9]", password) and re.search(r"[^a-zA-Z0-9]", password):
@@ -67,15 +69,36 @@ def list_users():
     return users
 
 
-def reset_password(email: str, new_password: str) -> str | None:
-    if not is_valid_password(new_password):
-        return "Password does not meet complexity requirements."
+def create_reset_token(email: str) -> tuple[str | None, str | None]:
+    """Create a one-use reset token for the user with given email."""
     db = Session()
     user = db.query(User).filter_by(email=email).first()
     if not user:
         db.close()
-        return "No user found with that email."
+        return None, "No user found with that email."
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+    reset_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
+    db.add(reset_token)
+    db.commit()
+    db.close()
+    return token, None
+
+
+def reset_password_with_token(token: str, new_password: str) -> str | None:
+    if not is_valid_password(new_password):
+        return "Password does not meet complexity requirements."
+    db = Session()
+    reset = db.query(PasswordResetToken).filter_by(token=token, used=False).first()
+    if not reset or reset.expires_at < datetime.utcnow():
+        db.close()
+        return "Invalid or expired token."
+    user = db.query(User).filter_by(id=reset.user_id).first()
+    if not user:
+        db.close()
+        return "Invalid token."
     user.password_hash = generate_password_hash(new_password)
+    reset.used = True
     db.commit()
     db.close()
     return None
