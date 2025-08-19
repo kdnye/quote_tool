@@ -10,18 +10,37 @@
 <form method="post">
   <label>Type
     <select name="quote_type">
-      <option value="Hotshot">Hotshot</option>
-      <option value="Air">Air</option>
+      <option value="Hotshot" {% if request.form.get('quote_type', 'Hotshot') == 'Hotshot' %}selected{% endif %}>Hotshot</option>
+      <option value="Air" {% if request.form.get('quote_type') == 'Air' %}selected{% endif %}>Air</option>
     </select>
   </label><br>
-  <label>Origin Zip <input type="text" name="origin"></label><br>
-  <label>Destination Zip <input type="text" name="destination"></label><br>
-  <label>Weight (lbs) <input type="number" step="0.01" name="weight"></label><br>
+  <label>Origin Zip <input type="text" name="origin" value="{{ request.form.origin }}"></label><br>
+  <label>Destination Zip <input type="text" name="destination" value="{{ request.form.destination }}"></label><br>
+  <label>Actual Weight (lbs) <input type="number" step="0.01" name="weight" value="{{ request.form.weight }}"></label><br>
+  <label>Pieces <input type="number" name="pieces" value="{{ request.form.get('pieces', 1) }}"></label><br>
+  <label>Length (in) <input type="number" step="0.01" name="length" value="{{ request.form.length }}"></label><br>
+  <label>Width (in) <input type="number" step="0.01" name="width" value="{{ request.form.width }}"></label><br>
+  <label>Height (in) <input type="number" step="0.01" name="height" value="{{ request.form.height }}"></label><br>
+  {% if accessorial_options %}
+  <fieldset>
+    <legend>Accessorials</legend>
+    {% for acc in accessorial_options %}
+      <label><input type="checkbox" name="accessorials" value="{{ acc }}" {% if acc in request.form.getlist('accessorials') %}checked{% endif %}> {{ acc }}</label><br>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
   <button type="submit">Generate Quote</button>
 </form>
 {% if quote %}
 <h2>Last Quote</h2>
-<p>ID: {{ quote.quote_id }} | Total: ${{ '%.2f'|format(quote.total) }}</p>
-<a href="{{ url_for('quote.email_request', quote_id=quote.quote_id) }}">Email Request</a>
+<div style="font-size:1.2em;line-height:1.4;">
+  Quote Total: ${{ '%.2f'|format(quote.total) }}<br>
+  Origin: {{ quote.origin }} | Destination: {{ quote.destination }}<br>
+  Type: {{ quote.quote_type }} | Weight: {{ '%.2f'|format(quote.weight) }} lbs
+</div>
+<p>
+  <a href="{{ url_for('quote.email_request', quote_id=quote.quote_id) }}">Email Request</a> |
+  <a href="{{ book_url }}" target="_blank" rel="noopener">Book Quote</a>
+</p>
 {% endif %}
 <a href="{{ url_for('auth.logout') }}">Logout</a>
