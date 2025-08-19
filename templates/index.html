@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Create Quote</h1>
+<form method="post" action="/">
+<div class="row g-3">
+<div class="col-md-3">
+<label for="origin_zip" class="form-label">Origin ZIP</label>
+<input type="text" class="form-control" id="origin_zip" name="origin_zip" value="{{ origin_zip or '' }}" required />
+</div>
+<div class="col-md-3">
+<label for="destination_zip" class="form-label">Destination ZIP</label>
+<input type="text" class="form-control" id="destination_zip" name="destination_zip" value="{{ destination_zip or '' }}" required />
+</div>
+<div class="col-md-4">
+<label for="email" class="form-label">Recipient Email (optional)</label>
+<input type="email" class="form-control" id="email" name="email" value="{{ email or '' }}" />
+</div>
+<div class="col-md-2 d-flex align-items-end">
+<button type="submit" class="btn btn-primary w-100">Calculate</button>
+</div>
+</div>
+</form>
+
+
+{% if miles is not none %}
+<hr />
+<h4>Result</h4>
+<p><strong>Estimated distance:</strong> {{ '%.2f' % miles }} miles</p>
+
+
+<div class="d-flex gap-2">
+<form method="post" action="{{ url_for('map_view') }}">
+<input type="hidden" name="origin_zip" value="{{ origin_zip }}" />
+<input type="hidden" name="destination_zip" value="{{ destination_zip }}" />
+<button type="submit" class="btn btn-outline-secondary">Show Map</button>
+</form>
+
+
+<form method="post" action="{{ url_for('send_email_route') }}">
+<input type="hidden" name="origin_zip" value="{{ origin_zip }}" />
+<input type="hidden" name="destination_zip" value="{{ destination_zip }}" />
+<input type="hidden" name="email" value="{{ email }}" />
+<button type="submit" class="btn btn-success" {% if not email %}disabled{% endif %}>Send Quote Email</button>
+</form>
+</div>
+{% endif %}
+{% endblock %}
