@@ -3,17 +3,20 @@ from werkzeug.security import generate_password_hash
 import pandas as pd
 
 from flask_app import create_app
-from db import Base, engine, Session, User, Quote
-from services import quote as quote_service
-
-Base.metadata.create_all(engine)
+from app.models import db, User, Quote
 
 
 @pytest.fixture
 def app():
     app = create_app()
     app.config["TESTING"] = True
-    return app
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    with app.app_context():
+        db.create_all()
+    yield app
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
@@ -22,22 +25,20 @@ def client(app):
 
 
 @pytest.fixture(autouse=True)
-def clear_db():
-    with Session() as session:
-        session.query(Quote).delete()
-        session.query(User).delete()
-        session.commit()
+def clear_db(app):
+    with app.app_context():
+        Quote.query.delete()
+        User.query.delete()
+        db.session.commit()
     yield
 
 
-def seed_user(email="test@example.com", password="Password!123"):
-    with Session() as session:
-        user = User(
-            name="Test", email=email, password_hash=generate_password_hash(password), is_approved=True
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+def seed_user(app, email="test@example.com", password="Password!123"):
+    with app.app_context():
+        user = User(name="Test", email=email, is_active=True)
+        user.password_hash = generate_password_hash(password)
+        db.session.add(user)
+        db.session.commit()
         return user
 
 
@@ -45,30 +46,30 @@ def login(client, email="test@example.com", password="Password!123"):
     return client.post(
         "/login",
         data={"email": email, "password": password},
-        follow_redirects=True,
+        follow_redirects=False,
     )
 
 
-def test_login_and_logout(client):
-    seed_user()
+def test_login_and_logout(app, client):
+    seed_user(app)
     response = login(client)
-    assert response.status_code == 200
+    assert response.status_code == 302
     with client.session_transaction() as sess:
         assert sess.get("_user_id") is not None
 
-    client.get("/logout", follow_redirects=True)
+    client.get("/logout", follow_redirects=False)
     with client.session_transaction() as sess:
         assert sess.get("_user_id") is None
 
 
 def test_quote_requires_login(client):
-    response = client.get("/quote")
+    response = client.get("/quotes/new")
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
 
 
-def test_quote_creation(client, monkeypatch):
-    seed_user()
+def test_quote_creation(app, client, monkeypatch):
+    seed_user(app)
     login(client)
 
     workbook = {
@@ -84,22 +85,24 @@ def test_quote_creation(client, monkeypatch):
         )
     }
 
-    monkeypatch.setattr(quote_service, "_load_workbook", lambda: workbook)
+    monkeypatch.setattr(
+        "app.quotes.routes._get_normalized_workbook", lambda: workbook
+    )
     monkeypatch.setattr("quote.logic_hotshot.get_distance_miles", lambda o, d: 150)
 
     response = client.post(
-        "/quote",
-        data={
+        "/quotes/new",
+        json={
             "quote_type": "Hotshot",
-            "origin": "12345",
-            "destination": "67890",
-            "weight": "120",
+            "origin_zip": "12345",
+            "dest_zip": "67890",
+            "weight_actual": 120,
         },
-        follow_redirects=True,
     )
 
     assert response.status_code == 200
-    assert b"Quote generated" in response.data
+    data = response.get_json()
+    assert data["price"] == pytest.approx(270.0)
 
-    with Session() as session:
-        assert session.query(Quote).count() == 1
+    with app.app_context():
+        assert Quote.query.count() == 1
