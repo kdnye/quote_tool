@@ -1,15 +1,84 @@
-<!doctype html>
-<title>Admin</title>
-<h1>Admin Dashboard</h1>
-<p>Users: {{ users|length }} | Quotes: {{ quotes|length }}</p>
-<ul>
-  {% for u in users %}
-    <li>{{ u.name }} ({{ u.email }})</li>
-  {% endfor %}
-</ul>
-<ul>
-  {% for q in quotes %}
-    <li>{{ q.quote_id }} - ${{ '%.2f'|format(q.total) }}</li>
-  {% endfor %}
-</ul>
-<a href="{{ url_for('auth.logout') }}">Logout</a>
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block content %}
+<div class="container" style="padding:16px;">
+  <h1>🛠️ Admin Panel</h1>
+
+  <section>
+    <h2>📋 All Users</h2>
+    <table id="users" border="1" cellpadding="6"></table>
+  </section>
+
+  <section style="margin-top:24px;">
+    <h2>✅ Approve Users</h2>
+    <select id="approve_id"></select>
+    <button onclick="approve()">Approve</button>
+  </section>
+
+  <section style="margin-top:24px;">
+    <h2>🔄 Change Roles</h2>
+    <input id="role_id" type="number" placeholder="User ID">
+    <select id="role_val">
+      <option value="user">user</option>
+      <option value="admin">admin</option>
+    </select>
+    <button onclick="setRole()">Update Role</button>
+  </section>
+
+  <section style="margin-top:24px;">
+    <h2>🗑️ Delete User</h2>
+    <input id="del_id" type="number" placeholder="User ID">
+    <button onclick="delUser()">Delete</button>
+  </section>
+
+  <pre id="msg" style="margin-top:16px;"></pre>
+</div>
+
+<script>
+async function load() {
+  const r = await fetch("/admin/users");
+  const j = await r.json();
+  if (!j.ok) { document.getElementById("msg").textContent = j.error || "Error"; return; }
+
+  // table
+  const t = document.getElementById("users");
+  t.innerHTML = "";
+  const head = ["id","name","email","phone","business","role","approved","created"];
+  t.insertAdjacentHTML("beforeend", "<tr>"+head.map(h=>`<th>${h}</th>`).join("")+"</tr>");
+  j.users.forEach(u=>{
+    t.insertAdjacentHTML("beforeend",
+      "<tr>"+head.map(h=>`<td>${u[h] ?? ""}</td>`).join("")+"</tr>");
+  });
+
+  // pending select
+  const r2 = await fetch("/admin/users/pending");
+  const j2 = await r2.json();
+  const sel = document.getElementById("approve_id");
+  sel.innerHTML = (j2.users||[]).map(u=>`<option value="${u.id}">${u.id} — ${u.email}</option>`).join("");
+}
+
+async function approve() {
+  const id = document.getElementById("approve_id").value;
+  const r = await fetch("/admin/users/approve", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id: Number(id)})});
+  document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
+  load();
+}
+
+async function setRole() {
+  const id = Number(document.getElementById("role_id").value);
+  const role = document.getElementById("role_val").value;
+  const r = await fetch("/admin/users/role", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id, role})});
+  document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
+  load();
+}
+
+async function delUser() {
+  const id = Number(document.getElementById("del_id").value);
+  const r = await fetch(`/admin/users/${id}`, {method:"DELETE"});
+  document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
+  load();
+}
+
+load();
+</script>
+{% endblock %}
