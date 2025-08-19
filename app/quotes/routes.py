@@ -2,6 +2,7 @@
 from flask import render_template, request, jsonify
 from flask_login import login_required, current_user
 import json
+import os
 import pandas as pd
 from . import quotes_bp
 from ..models import db, Quote
@@ -9,6 +10,29 @@ from config import Config
 from quote.logic_hotshot import calculate_hotshot_quote
 from quote.logic_air import calculate_air_quote
 from quote.utils import normalize_workbook, calculate_accessorials
+
+
+# Cache for the normalized workbook to avoid reloading on every request
+_workbook_cache = None
+_workbook_mtime = None
+
+
+def _get_normalized_workbook():
+    """Return a cached normalized workbook, reloading if the file changed."""
+    global _workbook_cache, _workbook_mtime
+    workbook_path = Config.WORKBOOK_PATH
+    try:
+        mtime = os.path.getmtime(workbook_path)
+    except OSError:
+        mtime = None
+
+    if _workbook_cache is None or _workbook_mtime != mtime:
+        _workbook_cache = normalize_workbook(
+            pd.read_excel(workbook_path, sheet_name=None)
+        )
+        _workbook_mtime = mtime
+
+    return _workbook_cache
 
 @quotes_bp.route("/new", methods=["GET", "POST"])
 @login_required
@@ -26,9 +50,7 @@ def new_quote():
         except Exception:
             accessorials_json = {}
 
-        workbook = normalize_workbook(
-            pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
-        )
+        workbook = _get_normalized_workbook()
         selected = []
         if isinstance(accessorials_json, dict):
             selected = list(accessorials_json.keys())
