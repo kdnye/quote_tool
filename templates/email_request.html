@@ -9,6 +9,7 @@
 {% endwith %}
 <h2>Quote ID: {{ quote.quote_id }}</h2>
 <form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Shipper Name <input type="text" name="shipper_name"></label><br>
   <label>Shipper Address <input type="text" name="shipper_address"></label><br>
   <label>Shipper Contact <input type="text" name="shipper_contact"></label><br>

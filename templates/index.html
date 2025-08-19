@@ -2,6 +2,7 @@
 {% block content %}
 <h1 class="mb-4">Create Quote</h1>
 <form method="post" action="/">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="row g-3">
 <div class="col-md-3">
 <label for="origin_zip" class="form-label">Origin ZIP</label>
@@ -30,6 +31,7 @@
 
 <div class="d-flex gap-2">
 <form method="post" action="{{ url_for('map_view') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input type="hidden" name="origin_zip" value="{{ origin_zip }}" />
 <input type="hidden" name="destination_zip" value="{{ destination_zip }}" />
 <button type="submit" class="btn btn-outline-secondary">Show Map</button>
@@ -37,6 +39,7 @@
 
 
 <form method="post" action="{{ url_for('send_email_route') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input type="hidden" name="origin_zip" value="{{ origin_zip }}" />
 <input type="hidden" name="destination_zip" value="{{ destination_zip }}" />
 <input type="hidden" name="email" value="{{ email }}" />

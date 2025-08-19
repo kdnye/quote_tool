@@ -8,6 +8,7 @@
   {% endif %}
 {% endwith %}
 <form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Type
     <select name="quote_type">
       <option value="Hotshot" {% if request.form.get('quote_type', 'Hotshot') == 'Hotshot' %}selected{% endif %}>Hotshot</option>

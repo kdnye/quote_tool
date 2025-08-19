@@ -35,6 +35,7 @@
 </div>
 
 <script>
+const csrfToken = "{{ csrf_token() }}";
 async function load() {
   const r = await fetch("/admin/users");
   const j = await r.json();
@@ -59,7 +60,7 @@ async function load() {
 
 async function approve() {
   const id = document.getElementById("approve_id").value;
-  const r = await fetch("/admin/users/approve", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id: Number(id)})});
+  const r = await fetch("/admin/users/approve", {method:"POST", headers:{"Content-Type":"application/json", "X-CSRFToken": csrfToken}, body: JSON.stringify({id: Number(id)})});
   document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
   load();
 }
@@ -67,14 +68,14 @@ async function approve() {
 async function setRole() {
   const id = Number(document.getElementById("role_id").value);
   const role = document.getElementById("role_val").value;
-  const r = await fetch("/admin/users/role", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id, role})});
+  const r = await fetch("/admin/users/role", {method:"POST", headers:{"Content-Type":"application/json", "X-CSRFToken": csrfToken}, body: JSON.stringify({id, role})});
   document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
   load();
 }
 
 async function delUser() {
   const id = Number(document.getElementById("del_id").value);
-  const r = await fetch(`/admin/users/${id}`, {method:"DELETE"});
+  const r = await fetch(`/admin/users/${id}`, {method:"DELETE", headers:{"X-CSRFToken": csrfToken}});
   document.getElementById("msg").textContent = (await r.json()).message || (await r.json()).error || "";
   load();
 }

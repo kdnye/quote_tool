@@ -1,3 +1,4 @@
+import re
 import pytest
 from werkzeug.security import generate_password_hash
 import pandas as pd
@@ -43,11 +44,20 @@ def seed_user(app, email="test@example.com", password="Password!123"):
 
 
 def login(client, email="test@example.com", password="Password!123"):
+    token = get_csrf_token(client)
     return client.post(
         "/login",
-        data={"email": email, "password": password},
+        data={"email": email, "password": password, "csrf_token": token},
         follow_redirects=False,
     )
+
+
+def get_csrf_token(client, url="/login"):
+    response = client.get(url)
+    html = response.data.decode()
+    match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    assert match, "CSRF token not found"
+    return match.group(1)
 
 
 def test_login_and_logout(app, client):
@@ -71,6 +81,7 @@ def test_quote_requires_login(client):
 def test_quote_creation(app, client, monkeypatch):
     seed_user(app)
     login(client)
+    token = get_csrf_token(client)
 
     workbook = {
         "Hotshot Rates": pd.DataFrame(
@@ -98,6 +109,7 @@ def test_quote_creation(app, client, monkeypatch):
             "dest_zip": "67890",
             "weight_actual": 120,
         },
+        headers={"X-CSRFToken": token},
     )
 
     assert response.status_code == 200

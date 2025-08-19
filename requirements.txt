@@ -11,6 +11,7 @@ PyMySQL==1.1.1
 Flask==3.0.0
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
 gunicorn==22.0.0
 Flask>=3.0
 python-dotenv>=1.0
