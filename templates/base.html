@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}FSI{% endblock %}</title>
+    {{ fsi_theme() }} {# injects the link to /theme/static/fsi.css #}
+    {% block head %}{% endblock %}
+  </head>
+  <body class="app-shell">
+    {% block content %}{% endblock %}
+  </body>
+</html>
