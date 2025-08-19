@@ -1,39 +1,26 @@
-# File: theme.py
-import streamlit as st
+# theme.py (Flask version)
+from flask import Blueprint, current_app, render_template_string, url_for
 
-def inject_fsi_theme():
-    st.markdown("""
-        <style>
-            body {
-                background-color: #a0a0a0;
-                color: #FFFFFF;
-            }
-            .stApp {
-                background-color: #a0a0a0;
-                color: #FFFFFF;
-            }
-            .stButton>button {
-                background-color: #005B99;
-                color: white;
-                border-radius: 6px;
-                padding: 0.5em 1em;
-                font-weight: 600;
-            }
-            .stButton>button:hover {
-                background-color: #003366;
-            }
-            .stRadio > div {
-                color: #FFFFFF;
-            }
-            h1, h2, h3, h4, h5, h6 {
-                color: #FFFFFF;
-            }
-            .stCheckbox > label, .stTextInput > div > label, .stNumberInput > div > label {
-                color: #FFFFFF;
-                font-weight: 500;
-            }
-            .stSubheader, .stMarkdown {
-                color: #FFFFFF;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+bp = Blueprint(
+    "theme",
+    __name__,
+    static_folder="static",           # serves /theme/static/…
+    static_url_path="/theme/static",  # final URL will be /theme/static/…
+    template_folder="templates"
+)
+
+def init_fsi_theme(app):
+    """
+    Register the theme blueprint and a Jinja helper.
+    Usage in templates: {{ fsi_theme() }}
+    Or include the CSS link directly: <link rel="stylesheet" href="{{ url_for('theme.static', filename='fsi.css') }}">
+    """
+    app.register_blueprint(bp)
+
+    @app.context_processor
+    def _fsi_theme_helper():
+        def fsi_theme():
+            href = url_for("theme.static", filename="fsi.css")
+            # returns a <link> tag you can include in base.html
+            return render_template_string('<link rel="stylesheet" href="{{ href }}">', href=href)
+        return {"fsi_theme": fsi_theme}
