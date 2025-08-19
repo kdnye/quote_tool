@@ -26,6 +26,22 @@ def test_calculate_hotshot_quote(monkeypatch):
     assert result['quote_total'] == pytest.approx(280.0)
 
 
+def test_calculate_hotshot_quote_missing_zone(monkeypatch):
+    rates_df = pd.DataFrame({
+        'MILES': [100],
+        'ZONE': ['A'],
+        'PER LB': [2.0],
+        'FUEL': [0.1],
+        'MIN': [50],
+        'WEIGHT BREAK': [100],
+    })
+
+    monkeypatch.setattr('quote.logic_hotshot.get_distance_miles', lambda o, d: 150)
+
+    with pytest.raises(ValueError):
+        calculate_hotshot_quote('12345', '67890', 120, 10, rates_df)
+
+
 def test_calculate_air_quote():
     workbook = {
         'ZIP CODE ZONES': pd.DataFrame({
