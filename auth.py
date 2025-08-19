@@ -1,11 +1,33 @@
 # auth.py (Flask version)
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, current_app, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+import secrets
+from datetime import datetime, timedelta
+import time
+from collections import defaultdict
+import smtplib
+from email.message import EmailMessage
 
-from db import Session, User  # assumes your existing Session factory and User model
+from db import Session, User, PasswordResetToken  # assumes your existing Session factory and User model
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
+reset_attempts = defaultdict(list)
+RESET_LIMIT = 5
+RESET_WINDOW = 3600
+
+
+def _send_email(to: str, subject: str, body: str) -> None:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = current_app.config.get("MAIL_DEFAULT_SENDER", "no-reply@example.com")
+    msg["To"] = to
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP("localhost") as smtp:
+            smtp.send_message(msg)
+    except Exception:
+        print(f"EMAIL to {to}: {body}")
 
 # -----------------------
 # Helpers
@@ -146,22 +168,61 @@ def register():
         db.close()
 
 
+@bp.post("/request-reset")
+def request_reset():
+    """POST /auth/request-reset -> {email}"""
+    data, missing = _json_required(["email"])
+    if missing:
+        return (
+            jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}),
+            400,
+        )
+    email = data["email"].strip().lower()
+    if not EMAIL_RE.match(email):
+        return jsonify({"ok": False, "error": "Invalid email format."}), 400
+
+    ip = request.remote_addr or "anon"
+    now = time.time()
+    attempts = reset_attempts[ip]
+    reset_attempts[ip] = [t for t in attempts if now - t < RESET_WINDOW]
+    if len(reset_attempts[ip]) >= RESET_LIMIT:
+        return jsonify({"ok": False, "error": "Too many reset requests. Try again later."}), 429
+
+    reset_attempts[ip].append(now)
+
+    db = Session()
+    try:
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            return (
+                jsonify({"ok": False, "error": "No user found with that email."}),
+                404,
+            )
+        token = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        db.add(PasswordResetToken(user_id=user.id, token=token, expires_at=expires))
+        db.commit()
+    finally:
+        db.close()
+
+    _send_email(email, "Password Reset", f"Use this token to reset your password: {token}")
+    return jsonify({"ok": True, "message": "Password reset token sent."})
+
+
 @bp.post("/reset-password")
 def reset_password():
-    """POST /auth/reset-password -> {email, new_password, confirm_password}"""
-    data, missing = _json_required(["email", "new_password", "confirm_password"])
+    """POST /auth/reset-password -> {token, new_password, confirm_password}"""
+    data, missing = _json_required(["token", "new_password", "confirm_password"])
     if missing:
         return (
             jsonify({"ok": False, "error": f"Missing fields: {', '.join(missing)}"}),
             400,
         )
 
-    email = data["email"].strip().lower()
+    token = data["token"]
     new_password = data["new_password"]
     confirm_password = data["confirm_password"]
 
-    if not EMAIL_RE.match(email):
-        return jsonify({"ok": False, "error": "Invalid email format."}), 400
     if new_password != confirm_password:
         return jsonify({"ok": False, "error": "Passwords do not match."}), 400
     if not is_valid_password(new_password):
@@ -174,14 +235,18 @@ def reset_password():
 
     db = Session()
     try:
-        user = db.query(User).filter_by(email=email).first()
+        reset = (
+            db.query(PasswordResetToken)
+            .filter_by(token=token, used=False)
+            .first()
+        )
+        if not reset or reset.expires_at < datetime.utcnow():
+            return jsonify({"ok": False, "error": "Invalid or expired token."}), 400
+        user = db.query(User).filter_by(id=reset.user_id).first()
         if not user:
-            return (
-                jsonify({"ok": False, "error": "No user found with that email."}),
-                404,
-            )
-
+            return jsonify({"ok": False, "error": "Invalid token."}), 400
         user.password_hash = generate_password_hash(new_password)
+        reset.used = True
         db.commit()
         return jsonify({"ok": True, "message": "Password updated successfully."})
     finally:
