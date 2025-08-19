@@ -30,8 +30,8 @@ Python 3.8+
 pip install -r requirements.txt
 ```
 
-Key packages: `Flask`, `SQLAlchemy`, `pandas`, `openpyxl`, `werkzeug`,
-`requests`, `gunicorn`
+Key packages: `Flask`, `Flask-SQLAlchemy`, `SQLAlchemy`, `pandas`,
+`openpyxl`, `werkzeug`, `requests`, `gunicorn`
 
 ### 3. Required Files
 

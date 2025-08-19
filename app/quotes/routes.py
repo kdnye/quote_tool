@@ -1,11 +1,14 @@
 # app/quotes/routes.py
 from flask import render_template, request, jsonify
 from flask_login import login_required, current_user
+import json
+import pandas as pd
 from . import quotes_bp
 from ..models import db, Quote
-from . import logic_hotshot, logic_air
-from .. import create_app
-import json
+from config import Config
+from quote.logic_hotshot import calculate_hotshot_quote
+from quote.logic_air import calculate_air_quote
+from quote.utils import normalize_workbook, calculate_accessorials
 
 @quotes_bp.route("/new", methods=["GET", "POST"])
 @login_required
@@ -23,14 +26,36 @@ def new_quote():
         except Exception:
             accessorials_json = {}
 
+        workbook = normalize_workbook(
+            pd.read_excel(Config.WORKBOOK_PATH, sheet_name=None)
+        )
+        selected = []
+        if isinstance(accessorials_json, dict):
+            selected = list(accessorials_json.keys())
+        elif isinstance(accessorials_json, list):
+            selected = accessorials_json
+
+        accessorial_total = 0.0
+        acc_df = workbook.get("Accessorials")
+        if acc_df is not None:
+            accessorial_total = calculate_accessorials(
+                acc_df, selected, quote_type, weight_actual
+            )
+
         if quote_type.lower() == "air":
-            price, warnings = logic_air.calculate(
-                origin_zip, dest_zip, weight_actual, weight_dim, accessorials_json
+            result = calculate_air_quote(
+                origin_zip, dest_zip, weight_actual, accessorial_total, workbook
             )
         else:
-            price, warnings = logic_hotshot.calculate(
-                origin_zip, dest_zip, weight_actual, weight_dim, accessorials_json
+            result = calculate_hotshot_quote(
+                origin_zip,
+                dest_zip,
+                weight_actual,
+                accessorial_total,
+                workbook.get("Hotshot Rates"),
             )
+        price = result.get("quote_total", 0.0)
+        warnings = []
 
         q = Quote(
             quote_type=quote_type.title(),
