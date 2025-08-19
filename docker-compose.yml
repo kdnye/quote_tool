@@ -5,7 +5,7 @@ services:
     build: .
     container_name: quote_tool
     ports:
-      - "8501:8501"
+      - "8000:8000"
     volumes:
       - .:/app  # Mount all files (db, Excel, Python code)
     environment:
