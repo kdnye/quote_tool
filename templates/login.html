@@ -8,10 +8,10 @@
   {% endif %}
 {% endwith %}
 <form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Email <input type="email" name="email"></label><br>
   <label>Password <input type="password" name="password"></label><br>
   <button type="submit">Login</button>
 </form>
-<a href="{{ url_for('auth.register') }}">Register</a> |
-<a href="{{ url_for('auth.reset_password') }}">Forgot password?</a>
+<a href="{{ url_for('auth.register') }}">Register</a>
 
