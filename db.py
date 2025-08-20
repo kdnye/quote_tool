@@ -9,7 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.orm import declarative_base, relationship, scoped_session, sessionmaker
 from flask_login import UserMixin
 from datetime import datetime
 from sqlalchemy.sql import func
@@ -18,8 +18,10 @@ from config import Config
 
 engine = create_engine(Config.DATABASE_URL)
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
-session = Session()
+# Use scoped_session to provide thread-local sessions that are removed
+# after each request context.  Sessions should be acquired with
+# ``Session()`` and cleaned up via ``Session.remove()``.
+Session = scoped_session(sessionmaker(bind=engine))
 
 
 class User(Base, UserMixin):

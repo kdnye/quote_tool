@@ -6,6 +6,13 @@ from db import Session, User
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
+@bp.teardown_request
+def remove_session(exception=None):
+    """Ensure scoped sessions are removed after each request."""
+    if hasattr(Session, "remove"):
+        Session.remove()
+
+
 @bp.before_request
 def _csrf_protect():
     """Reject mutating requests missing the ``X-CSRFToken`` header.
@@ -66,24 +73,18 @@ def _user_to_dict(u: User):
 @admin_required_json
 def list_users():
     """GET /admin/users  -> all users"""
-    db = Session()
-    try:
+    with Session() as db:
         users = db.query(User).all()
         return jsonify({"ok": True, "users": [_user_to_dict(u) for u in users]})
-    finally:
-        db.close()
 
 
 @bp.get("/users/pending")
 @admin_required_json
 def list_pending_users():
     """GET /admin/users/pending  -> users where is_approved = 0/False"""
-    db = Session()
-    try:
+    with Session() as db:
         pending = db.query(User).filter(User.is_approved == False).all()  # noqa: E712
         return jsonify({"ok": True, "users": [_user_to_dict(u) for u in pending]})
-    finally:
-        db.close()
 
 
 @bp.post("/users/approve")
@@ -95,8 +96,7 @@ def approve_user():
     if not uid:
         return jsonify({"ok": False, "error": "Missing 'id'."}), 400
 
-    db = Session()
-    try:
+    with Session() as db:
         # ORM update (prefer over raw SQL)
         user = db.query(User).get(uid)
         if not user:
@@ -104,8 +104,6 @@ def approve_user():
         user.is_approved = True
         db.commit()
         return jsonify({"ok": True, "message": f"User {uid} approved."})
-    finally:
-        db.close()
 
 
 @bp.post("/users/role")
@@ -118,32 +116,26 @@ def change_role():
     if not uid or new_role not in {"user", "admin"}:
         return jsonify({"ok": False, "error": "Provide valid 'id' and 'role' (user|admin)."}), 400
 
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).get(uid)
         if not user:
             return jsonify({"ok": False, "error": "User not found."}), 404
         user.role = new_role
         db.commit()
         return jsonify({"ok": True, "message": f"User {uid} role set to {new_role}."})
-    finally:
-        db.close()
 
 
 @bp.delete("/users/<int:uid>")
 @admin_required_json
 def delete_user(uid: int):
     """DELETE /admin/users/<uid>"""
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).get(uid)
         if not user:
             return jsonify({"ok": False, "error": "User not found."}), 404
         db.delete(user)
         db.commit()
         return jsonify({"ok": True, "message": f"User {uid} deleted."})
-    finally:
-        db.close()
 
 
 # ---- Optional: minimal HTML admin page (table + fetch actions) ----

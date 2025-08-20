@@ -22,6 +22,13 @@ except Exception:
 
 bp = Blueprint("email_api", __name__, url_prefix="/email")
 
+
+@bp.teardown_request
+def remove_session(exception=None):
+    """Ensure scoped sessions are removed after each request."""
+    if hasattr(Session, "remove"):
+        Session.remove()
+
 BOOK_URL = "https://freightservices.ts2000.net/login?returnUrl=%2FLogin%2F"
 ADMIN_FEE = 15.00  # Email-only processing fee
 EMAIL_TO = "operations@freightservices.net"
@@ -30,8 +37,7 @@ EMAIL_TO = "operations@freightservices.net"
 def _load_quote_from_db(quote_id: str):
     if not quote_id:
         return None
-    db = Session()
-    try:
+    with Session() as db:
         q = db.query(Quote).filter(Quote.quote_id == quote_id).first()
         if not q:
             return None
@@ -48,8 +54,6 @@ def _load_quote_from_db(quote_id: str):
             "guarantee_selected": guarantee_selected,
             "quote_total": float(q.total or 0.0),
         }
-    finally:
-        db.close()
 
 def _first_numeric(series: pd.Series) -> float:
     """Return the first numeric-looking value; handle $, commas, %, skip 'multiply' notes."""
@@ -265,8 +269,7 @@ def create_email_quote():
 
     # Persist EmailQuoteRequest unless preview_only
     if not preview_only:
-        db = Session()
-        try:
+        with Session() as db:
             new_request = EmailQuoteRequest(
                 quote_id=quote_id or "",
                 shipper_name=shipper.get("name",""),
@@ -282,8 +285,6 @@ def create_email_quote():
             )
             db.add(new_request)
             db.commit()
-        finally:
-            db.close()
 
     # CSV content (frontend can trigger a download)
     csv_text = _build_csv(
