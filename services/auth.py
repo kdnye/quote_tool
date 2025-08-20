@@ -4,104 +4,27 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, render_template_string, request, redirect, url_for, session, flash
+from flask import (
+    Blueprint,
+    render_template_string,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    current_app,
+)
 from jinja2 import DictLoader
 
-from werkzeug.security import generate_password_hash
-
-# Import your existing helpers and models
-from db import Session, User, PasswordResetToken
-from werkzeug.security import check_password_hash
-
-# ---- Reuse/keep your helper functions (optional import from a helpers module) ----
-import re
-import secrets
-from datetime import datetime, timedelta
-
-def is_valid_password(password: str) -> bool:
-    if len(password) >= 14 and re.search(r"[A-Z]", password) and re.search(r"[a-z]", password) and re.search(r"[0-9]", password) and re.search(r"[^a-zA-Z0-9]", password):
-        return True
-    if len(password) >= 24 and password.isalpha():
-        return True
-    return False
-
-
-def authenticate(email: str, password: str):
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    db.close()
-    if not user or not check_password_hash(user.password_hash, password):
-        return None, "Invalid credentials"
-    if not getattr(user, "is_approved", True):
-        return None, "Account pending approval"
-    return user, None
-
-
-def register_user(data: dict) -> str | None:
-    email = data.get("email")
-    password = data.get("password")
-    if not is_valid_password(password or ""):
-        return "Password does not meet complexity requirements."
-    db = Session()
-    if db.query(User).filter_by(email=email).first():
-        db.close()
-        return "Email already registered."
-    new_user = User(
-        name=data.get("name", ""),
-        email=email,
-        phone=data.get("phone", ""),
-        business_name=data.get("business_name", ""),
-        business_phone=data.get("business_phone", ""),
-        password_hash=generate_password_hash(password),
-        role=data.get("role", "user"),
-        is_approved=False,
-    )
-    db.add(new_user)
-    db.commit()
-    db.close()
-    return None
-
-
-def list_users():
-    db = Session()
-    users = db.query(User).all()
-    db.close()
-    return users
-
-
-def create_reset_token(email: str) -> tuple[str | None, str | None]:
-    """Create a one-use reset token for the user with given email."""
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    if not user:
-        db.close()
-        return None, "No user found with that email."
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(hours=1)
-    reset_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
-    db.add(reset_token)
-    db.commit()
-    db.close()
-    return token, None
-
-
-def reset_password_with_token(token: str, new_password: str) -> str | None:
-    if not is_valid_password(new_password):
-        return "Password does not meet complexity requirements."
-    db = Session()
-    reset = db.query(PasswordResetToken).filter_by(token=token, used=False).first()
-    if not reset or reset.expires_at < datetime.utcnow():
-        db.close()
-        return "Invalid or expired token."
-    user = db.query(User).filter_by(id=reset.user_id).first()
-    if not user:
-        db.close()
-        return "Invalid token."
-    user.password_hash = generate_password_hash(new_password)
-    reset.used = True
-    db.commit()
-    db.close()
-    return None
+from db import Session, User
+from services.auth_utils import (
+    is_valid_password,
+    authenticate,
+    register_user,
+    list_users,
+    create_reset_token,
+    reset_password_with_token,
+)
 
 # ---- Blueprint ----
 auth_bp = Blueprint("auth_bp", __name__)
