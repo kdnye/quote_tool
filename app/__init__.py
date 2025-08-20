@@ -1,5 +1,5 @@
 # app/__init__.py
-from flask import Flask
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -36,6 +36,6 @@ def create_app(config_class="config.Config"):
 
     @app.route("/")
     def index():
-        return "Quote Tool is running"
+        return render_template("index.html", title="Quote Tool")
 
     return app
