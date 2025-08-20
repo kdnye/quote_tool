@@ -44,7 +44,7 @@ def seed_user(app, email="test@example.com", password="Password!123"):
 
 
 def login(client, email="test@example.com", password="Password!123"):
-    token = get_csrf_token(client)
+    token = get_csrf_token(client, "/login")
     return client.post(
         "/login",
         data={"email": email, "password": password, "csrf_token": token},
@@ -52,7 +52,7 @@ def login(client, email="test@example.com", password="Password!123"):
     )
 
 
-def get_csrf_token(client, url="/login"):
+def get_csrf_token(client, url):
     response = client.get(url)
     html = response.data.decode()
     match = re.search(r'name="csrf_token" value="([^"]+)"', html)
@@ -81,7 +81,7 @@ def test_quote_requires_login(client):
 def test_quote_creation(app, client, monkeypatch):
     seed_user(app)
     login(client)
-    token = get_csrf_token(client)
+    token = get_csrf_token(client, "/login")
 
     workbook = {
         "Hotshot Rates": pd.DataFrame(
@@ -140,6 +140,32 @@ def test_quote_creation_requires_csrf_token(app, client):
             "origin_zip": "12345",
             "dest_zip": "67890",
             "weight_actual": 120,
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_register_requires_csrf_token(app, client):
+    response = client.post(
+        "/register",
+        data={
+            "name": "New",
+            "email": "new@example.com",
+            "password": "Password!123",
+            "confirm_password": "Password!123",
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_reset_password_requires_csrf_token(app, client):
+    seed_user(app)
+    response = client.post(
+        "/reset-password",
+        data={
+            "email": "test@example.com",
+            "new_password": "NewPassword!123",
+            "confirm_password": "NewPassword!123",
         },
     )
     assert response.status_code == 400

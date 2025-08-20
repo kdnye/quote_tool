@@ -50,6 +50,31 @@ def register():
         return redirect(url_for("auth.login"))
     return render_template("register.html")
 
+
+@auth_bp.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "warning")
+            return redirect(url_for("auth.reset_password"))
+
+        if not is_valid_password(new_password):
+            flash("Password does not meet complexity requirements.", "warning")
+            return redirect(url_for("auth.reset_password"))
+
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.set_password(new_password)
+            db.session.commit()
+            flash("Password updated. Please log in.", "success")
+            return redirect(url_for("auth.login"))
+        flash("Email not found.", "warning")
+    return render_template("reset_password.html")
+
 @auth_bp.route("/logout")
 @login_required
 def logout():
