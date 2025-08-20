@@ -27,9 +27,8 @@ def is_valid_password(password: str) -> bool:
 
 
 def authenticate(email: str, password: str):
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    db.close()
+    with Session() as db:
+        user = db.query(User).filter_by(email=email).first()
     if not user or not check_password_hash(user.password_hash, password):
         return None, "Invalid credentials"
     if not getattr(user, "is_approved", True):
@@ -42,65 +41,56 @@ def register_user(data: dict) -> str | None:
     password = data.get("password")
     if not is_valid_password(password or ""):
         return "Password does not meet complexity requirements."
-    db = Session()
-    if db.query(User).filter_by(email=email).first():
-        db.close()
-        return "Email already registered."
-    new_user = User(
-        name=data.get("name", ""),
-        email=email,
-        phone=data.get("phone", ""),
-        business_name=data.get("business_name", ""),
-        business_phone=data.get("business_phone", ""),
-        password_hash=generate_password_hash(password),
-        role=data.get("role", "user"),
-        is_approved=False,
-    )
-    db.add(new_user)
-    db.commit()
-    db.close()
+    with Session() as db:
+        if db.query(User).filter_by(email=email).first():
+            return "Email already registered."
+        new_user = User(
+            name=data.get("name", ""),
+            email=email,
+            phone=data.get("phone", ""),
+            business_name=data.get("business_name", ""),
+            business_phone=data.get("business_phone", ""),
+            password_hash=generate_password_hash(password),
+            role=data.get("role", "user"),
+            is_approved=False,
+        )
+        db.add(new_user)
+        db.commit()
     return None
 
 
 def list_users():
-    db = Session()
-    users = db.query(User).all()
-    db.close()
-    return users
+    with Session() as db:
+        return db.query(User).all()
 
 
 def create_reset_token(email: str) -> tuple[str | None, str | None]:
     """Create a one-use reset token for the user with given email."""
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    if not user:
-        db.close()
-        return None, "No user found with that email."
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(hours=1)
-    reset_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
-    db.add(reset_token)
-    db.commit()
-    db.close()
-    return token, None
+    with Session() as db:
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            return None, "No user found with that email."
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        reset_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
+        db.add(reset_token)
+        db.commit()
+        return token, None
 
 
 def reset_password_with_token(token: str, new_password: str) -> str | None:
     if not is_valid_password(new_password):
         return "Password does not meet complexity requirements."
-    db = Session()
-    reset = db.query(PasswordResetToken).filter_by(token=token, used=False).first()
-    if not reset or reset.expires_at < datetime.utcnow():
-        db.close()
-        return "Invalid or expired token."
-    user = db.query(User).filter_by(id=reset.user_id).first()
-    if not user:
-        db.close()
-        return "Invalid token."
-    user.password_hash = generate_password_hash(new_password)
-    reset.used = True
-    db.commit()
-    db.close()
+    with Session() as db:
+        reset = db.query(PasswordResetToken).filter_by(token=token, used=False).first()
+        if not reset or reset.expires_at < datetime.utcnow():
+            return "Invalid or expired token."
+        user = db.query(User).filter_by(id=reset.user_id).first()
+        if not user:
+            return "Invalid token."
+        user.password_hash = generate_password_hash(new_password)
+        reset.used = True
+        db.commit()
     return None
 
 # ---- Blueprint ----
@@ -277,15 +267,13 @@ def approve_user():
     if not _require_admin():
         return redirect(url_for('auth_bp.auth_page'))
     email = request.form.get('email','').strip().lower()
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    if not user:
-        db.close()
-        flash('User not found', 'warning')
-        return redirect(url_for('auth_bp.users_page'))
-    user.is_approved = True
-    db.commit()
-    db.close()
+    with Session() as db:
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            flash('User not found', 'warning')
+            return redirect(url_for('auth_bp.users_page'))
+        user.is_approved = True
+        db.commit()
     flash(f'Approved {email}', 'info')
     return redirect(url_for('auth_bp.users_page'))
 

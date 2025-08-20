@@ -6,11 +6,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 def setup_module(module):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    db = Session()
-    user = User(name="Reset", email="reset@example.com", password_hash=generate_password_hash("OldPass!1234"))
-    db.add(user)
-    db.commit()
-    db.close()
+    with Session() as db:
+        user = User(name="Reset", email="reset@example.com", password_hash=generate_password_hash("OldPass!1234"))
+        db.add(user)
+        db.commit()
 
 
 def test_token_reset_flow():
@@ -18,10 +17,9 @@ def test_token_reset_flow():
     assert error is None and token
     err = auth_service.reset_password_with_token(token, "NewStrongPass!1234")
     assert err is None
-    db = Session()
-    user = db.query(User).filter_by(email="reset@example.com").first()
-    assert check_password_hash(user.password_hash, "NewStrongPass!1234")
-    db.close()
+    with Session() as db:
+        user = db.query(User).filter_by(email="reset@example.com").first()
+        assert check_password_hash(user.password_hash, "NewStrongPass!1234")
     # token cannot be reused
     err2 = auth_service.reset_password_with_token(token, "AnotherStrongPass!1234")
     assert err2 is not None

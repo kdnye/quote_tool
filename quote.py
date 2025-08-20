@@ -272,32 +272,31 @@ def quote():
     # If saving a previously computed quote
     if request.method == 'POST' and request.form.get('persist') == '1':
         try:
-            db = Session()
-            zone = request.form.get('zone')
-            concat = request.form.get('concat')
-            quote_total = float(request.form.get('quote_total'))
-            weight_break = float(request.form.get('weight_break')) if request.form.get('weight_break') else None
-            per_lb = float(request.form.get('per_lb')) if request.form.get('per_lb') else None
-            min_charge = float(request.form.get('min_charge')) if request.form.get('min_charge') else None
-            meta = request.form.get('quote_metadata', '')
+            with Session() as db:
+                zone = request.form.get('zone')
+                concat = request.form.get('concat')
+                quote_total = float(request.form.get('quote_total'))
+                weight_break = float(request.form.get('weight_break')) if request.form.get('weight_break') else None
+                per_lb = float(request.form.get('per_lb')) if request.form.get('per_lb') else None
+                min_charge = float(request.form.get('min_charge')) if request.form.get('min_charge') else None
+                meta = request.form.get('quote_metadata', '')
 
-            q = Quote(
-                user_id=session.get('user'),
-                user_email=session.get('email', ''),
-                quote_type=quote_mode,
-                origin=origin,
-                destination=destination,
-                weight=weight or 0.0,
-                weight_method=("Dimensional" if weight_input_method == "Dimensional Weight" else "Actual"),
-                zone=(zone if quote_mode == 'Hotshot' else (concat or '')),
-                total=quote_total,
-                quote_metadata=meta,
-            )
-            db.add(q)
-            db.commit()
-            flash(f"Quote saved (ID: {q.quote_id})", "info")
-            db.close()
-            return redirect(url_for('quote_bp.quote'))
+                q = Quote(
+                    user_id=session.get('user'),
+                    user_email=session.get('email', ''),
+                    quote_type=quote_mode,
+                    origin=origin,
+                    destination=destination,
+                    weight=weight or 0.0,
+                    weight_method=("Dimensional" if weight_input_method == "Dimensional Weight" else "Actual"),
+                    zone=(zone if quote_mode == 'Hotshot' else (concat or '')),
+                    total=quote_total,
+                    quote_metadata=meta,
+                )
+                db.add(q)
+                db.commit()
+                flash(f"Quote saved (ID: {q.quote_id})", "info")
+                return redirect(url_for('quote_bp.quote'))
         except Exception as e:
             flash(f"Quote save failed: {e}", "warning")
 
@@ -491,9 +490,8 @@ def admin_quotes():
         flash("Admin login required.", "warning")
         return redirect(url_for("quote_bp.quote"))
 
-    db = Session()
-    quotes = db.query(Quote).all()
-    db.close()
+    with Session() as db:
+        quotes = db.query(Quote).all()
 
     from flask import current_app
     _ensure_templates(current_app)

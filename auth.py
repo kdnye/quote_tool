@@ -81,8 +81,7 @@ def login():
     if not EMAIL_RE.match(email):
         return jsonify({"ok": False, "error": "Invalid email format."}), 400
 
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).filter_by(email=email).first()
         if not user or not check_password_hash(
             getattr(user, "password_hash", ""), password
@@ -104,8 +103,6 @@ def login():
         return jsonify(
             {"ok": True, "message": f"Welcome {user.name}!", "landing": landing}
         )
-    finally:
-        db.close()
 
 
 @bp.post("/register")
@@ -142,8 +139,7 @@ def register():
             400,
         )
 
-    db = Session()
-    try:
+    with Session() as db:
         if db.query(User).filter_by(email=email).first():
             return jsonify({"ok": False, "error": "Email already registered."}), 409
 
@@ -164,8 +160,6 @@ def register():
             ),
             201,
         )
-    finally:
-        db.close()
 
 
 @bp.post("/request-reset")
@@ -190,8 +184,7 @@ def request_reset():
 
     reset_attempts[ip].append(now)
 
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).filter_by(email=email).first()
         if not user:
             return (
@@ -202,8 +195,6 @@ def request_reset():
         expires = datetime.utcnow() + timedelta(hours=1)
         db.add(PasswordResetToken(user_id=user.id, token=token, expires_at=expires))
         db.commit()
-    finally:
-        db.close()
 
     _send_email(email, "Password Reset", f"Use this token to reset your password: {token}")
     return jsonify({"ok": True, "message": "Password reset token sent."})
@@ -233,8 +224,7 @@ def reset_password():
             400,
         )
 
-    db = Session()
-    try:
+    with Session() as db:
         reset = (
             db.query(PasswordResetToken)
             .filter_by(token=token, used=False)
@@ -249,8 +239,6 @@ def reset_password():
         reset.used = True
         db.commit()
         return jsonify({"ok": True, "message": "Password updated successfully."})
-    finally:
-        db.close()
 
 
 @bp.post("/logout")

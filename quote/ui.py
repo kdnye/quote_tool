@@ -175,30 +175,29 @@ def quote_ui():
                 return
        
         # Persist to DB so the email page (new tab) can load via ?quote_id=...
-        db = Session()
-        q = Quote(
-            user_id=st.session_state.get("user"),
-            user_email=st.session_state.get("email", ""),
-            quote_type=quote_mode,
-            origin=origin,
-            destination=destination,
-            weight=weight,
-            weight_method="Dimensional" if weight == dim_weight else "Actual",
-            zone=str(result.get("zone", "")),
-            total=quote_total,                         # store BASE total (no admin fee)
-            quote_metadata=", ".join(selected),        # store selected accessorials as CSV
-            pieces=int(pieces),
-            length=float(length),
-            width=float(width),
-            height=float(height),
-            actual_weight=float(actual_weight),
-            dim_weight=float(dim_weight),
-        )
-        db.add(q)
-        db.commit()
-        # SQLAlchemy populates q.quote_id (UUID default on model)
-        saved_quote_id = q.quote_id
-        db.close()
+        with Session() as db:
+            q = Quote(
+                user_id=st.session_state.get("user"),
+                user_email=st.session_state.get("email", ""),
+                quote_type=quote_mode,
+                origin=origin,
+                destination=destination,
+                weight=weight,
+                weight_method="Dimensional" if weight == dim_weight else "Actual",
+                zone=str(result.get("zone", "")),
+                total=quote_total,  # store BASE total (no admin fee)
+                quote_metadata=", ".join(selected),  # store selected accessorials as CSV
+                pieces=int(pieces),
+                length=float(length),
+                width=float(width),
+                height=float(height),
+                actual_weight=float(actual_weight),
+                dim_weight=float(dim_weight),
+            )
+            db.add(q)
+            db.commit()
+            # SQLAlchemy populates q.quote_id (UUID default on model)
+            saved_quote_id = q.quote_id
 
         # Persist “last quote” in session (BASE total — no admin fee here)
         st.session_state.quote_id = saved_quote_id
