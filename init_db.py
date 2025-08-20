@@ -62,22 +62,27 @@ else:
     print("ℹ️ Tables already exist. Skipping creation.")
 
 # === Seed Default Admin ===
-default_admin_email = "admin@example.com"
-existing_admin = session.query(User).filter_by(email=default_admin_email).first()
+admin_email = os.getenv("ADMIN_EMAIL")
+admin_password = os.getenv("ADMIN_PASSWORD")
 
-if not existing_admin:
-    admin_user = User(
-        name="Admin",
-        email=default_admin_email,
-        phone="555-0000",
-        business_name="FSI",
-        business_phone="555-1111",
-        password_hash=generate_password_hash("SuperSecurePass!123"),
-        role="admin",
-        is_approved=True,
-    )
-    session.add(admin_user)
-    session.commit()
-    print("✅ Default admin user created.")
+if admin_email and admin_password:
+    existing_admin = session.query(User).filter_by(email=admin_email).first()
+
+    if not existing_admin:
+        admin_user = User(
+            name="Admin",
+            email=admin_email,
+            phone="555-0000",
+            business_name="FSI",
+            business_phone="555-1111",
+            password_hash=generate_password_hash(admin_password),
+            role="admin",
+            is_approved=True,
+        )
+        session.add(admin_user)
+        session.commit()
+        print("✅ Default admin user created.")
+    else:
+        print("ℹ️ Admin user already exists.")
 else:
-    print("ℹ️ Admin user already exists.")
+    print("ℹ️ ADMIN_EMAIL or ADMIN_PASSWORD not set. Skipping admin user creation.")

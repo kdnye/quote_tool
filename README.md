@@ -80,11 +80,15 @@ This exposes `POST /api/quote` for generating quotes and
 
 ## 🔧 Admin Access
 
-A default admin account is seeded on first run:
+To seed an initial administrator, provide credentials through environment
+variables before running `init_db.py`:
 
-- **Email:** `admin@example.com`
-- **Password:** `SuperSecurePass!123`
-  *(Change in `init_db.py` if needed)*
+```
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=strong-password
+```
+
+If these variables are absent, the seeding step is skipped.
 
 ---
 
