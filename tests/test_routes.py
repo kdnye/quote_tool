@@ -109,6 +109,7 @@ def test_quote_creation(app, client, monkeypatch):
 
 
 def test_new_quote_invalid_weight_non_numeric(app, client):
+    """Submitting non-numeric weight should return 400."""
     seed_user(app)
     login(client)
 
