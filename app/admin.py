@@ -18,7 +18,7 @@ def guard_admin():
 @admin_bp.route("/")
 def dashboard():
     users = User.query.order_by(User.created_at.desc()).all()
-    return render_template("admin_dashboard.html", users=users)
+    return render_template("admin.html", users=users)
 
 @admin_bp.route("/toggle/<int:user_id>", methods=["POST"])
 def toggle_active(user_id):

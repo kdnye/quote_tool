@@ -169,3 +169,18 @@ def test_reset_password_requires_csrf_token(app, client):
         },
     )
     assert response.status_code == 400
+
+
+def test_admin_toggle_requires_csrf_token(app, client):
+    admin = seed_user(app, email="admin@example.com")
+    with app.app_context():
+        admin.is_admin = True
+        target = User(name="Target", email="user2@example.com", is_active=True)
+        target.password_hash = generate_password_hash("Password!123")
+        db.session.add(target)
+        db.session.commit()
+        target_id = target.id
+
+    login(client, email="admin@example.com")
+    response = client.post(f"/admin/toggle/{target_id}")
+    assert response.status_code == 400
