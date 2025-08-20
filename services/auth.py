@@ -144,6 +144,7 @@ AUTH = """
     <article>
       <h3>Login</h3>
       <form method="post" action="{{ url_for('auth_bp.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label>Email <input type="email" name="email" required></label>
         <label>Password <input type="password" name="password" required></label>
         <button class="btn" type="submit">Login</button>
@@ -152,6 +153,7 @@ AUTH = """
     <article>
       <h3>Register</h3>
       <form method="post" action="{{ url_for('auth_bp.register') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label>Name <input name="name" required></label>
         <label>Email <input type="email" name="email" required></label>
         <label>Phone <input name="phone"></label>
@@ -184,6 +186,7 @@ USERS = """
           <td>
             {% if not u.is_approved %}
               <form method="post" action="{{ url_for('auth_bp.approve_user') }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                 <input type="hidden" name="email" value="{{ u.email }}" />
                 <button class="btn" type="submit">Approve</button>
               </form>

@@ -1,6 +1,7 @@
 import pytest
 from werkzeug.security import generate_password_hash
 import pandas as pd
+import re
 
 from flask_app import create_app
 from app.models import db, User, Quote
@@ -39,28 +40,29 @@ def seed_user(app, email="test@example.com", password="Password!123"):
         user.password_hash = generate_password_hash(password)
         db.session.add(user)
         db.session.commit()
-        return user
+def get_csrf_token(client, path):
+    """Fetch CSRF token by visiting the given path."""
+    resp = client.get(path)
+    match = re.search(r'name="csrf_token" value="([^"]+)"', resp.get_data(as_text=True))
+    return match.group(1) if match else None
 
 
 def login(client, email="test@example.com", password="Password!123"):
-    return client.post(
-        "/login",
-        data={"email": email, "password": password},
-        follow_redirects=False,
-    )
-
-
-def get_csrf_token(client, path):
-    """Fetch CSRF token by visiting the given path."""
-    try:
-        client.get(path)
-    except Exception:
-        pass
-    return client.get_cookie("csrf_token")
+    token = get_csrf_token(client, "/login")
+    data = {"email": email, "password": password, "csrf_token": token}
+    return client.post("/login", data=data, follow_redirects=False)
 
 
 def test_login_and_logout(app, client):
     seed_user(app)
+    # Missing CSRF token should be rejected
+    bad = client.post(
+        "/login",
+        data={"email": "test@example.com", "password": "Password!123"},
+        follow_redirects=False,
+    )
+    assert bad.status_code == 400
+
     response = login(client)
     assert response.status_code == 302
     with client.session_transaction() as sess:
@@ -80,7 +82,7 @@ def test_quote_requires_login(client):
 def test_quote_creation(app, client, monkeypatch):
     seed_user(app)
     login(client)
-    csrf_token = get_csrf_token(client, "/quotes/new")
+    csrf_token = get_csrf_token(client, "/login")
 
     workbook = {
         "Hotshot Rates": pd.DataFrame(
@@ -124,6 +126,7 @@ def test_new_quote_invalid_weight_non_numeric(app, client):
     """Submitting non-numeric weight should return 400."""
     seed_user(app)
     login(client)
+    csrf_token = get_csrf_token(client, "/login")
 
     response = client.post(
         "/quotes/new",
@@ -133,6 +136,7 @@ def test_new_quote_invalid_weight_non_numeric(app, client):
             "dest_zip": "67890",
             "weight_actual": "abc",
         },
+        headers={"X-CSRFToken": csrf_token},
     )
 
     assert response.status_code == 400
@@ -143,6 +147,7 @@ def test_new_quote_invalid_weight_non_numeric(app, client):
 def test_new_quote_invalid_weight_negative(app, client):
     seed_user(app)
     login(client)
+    csrf_token = get_csrf_token(client, "/login")
 
     response = client.post(
         "/quotes/new",
@@ -152,6 +157,7 @@ def test_new_quote_invalid_weight_negative(app, client):
             "dest_zip": "67890",
             "weight_actual": -5,
         },
+        headers={"X-CSRFToken": csrf_token},
     )
 
     assert response.status_code == 400
