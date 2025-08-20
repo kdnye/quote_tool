@@ -50,6 +50,15 @@ def login(client, email="test@example.com", password="Password!123"):
     )
 
 
+def get_csrf_token(client, path):
+    """Fetch CSRF token by visiting the given path."""
+    try:
+        client.get(path)
+    except Exception:
+        pass
+    return client.get_cookie("csrf_token")
+
+
 def test_login_and_logout(app, client):
     seed_user(app)
     response = login(client)
@@ -71,6 +80,7 @@ def test_quote_requires_login(client):
 def test_quote_creation(app, client, monkeypatch):
     seed_user(app)
     login(client)
+    csrf_token = get_csrf_token(client, "/quotes/new")
 
     workbook = {
         "Hotshot Rates": pd.DataFrame(
@@ -90,6 +100,7 @@ def test_quote_creation(app, client, monkeypatch):
     )
     monkeypatch.setattr("quote.logic_hotshot.get_distance_miles", lambda o, d: 150)
 
+    headers = {"X-CSRFToken": csrf_token} if csrf_token else {}
     response = client.post(
         "/quotes/new",
         json={
@@ -98,6 +109,7 @@ def test_quote_creation(app, client, monkeypatch):
             "dest_zip": "67890",
             "weight_actual": 120,
         },
+        headers=headers,
     )
 
     assert response.status_code == 200
