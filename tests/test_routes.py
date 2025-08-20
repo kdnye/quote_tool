@@ -118,3 +118,28 @@ def test_quote_creation(app, client, monkeypatch):
 
     with app.app_context():
         assert Quote.query.count() == 1
+
+
+def test_login_requires_csrf_token(app, client):
+    seed_user(app)
+    client.get("/login")
+    response = client.post(
+        "/login",
+        data={"email": "test@example.com", "password": "Password!123"},
+    )
+    assert response.status_code == 400
+
+
+def test_quote_creation_requires_csrf_token(app, client):
+    seed_user(app)
+    login(client)
+    response = client.post(
+        "/quotes/new",
+        json={
+            "quote_type": "Hotshot",
+            "origin_zip": "12345",
+            "dest_zip": "67890",
+            "weight_actual": 120,
+        },
+    )
+    assert response.status_code == 400
