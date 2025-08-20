@@ -29,6 +29,13 @@ from services.auth_utils import (
 # ---- Blueprint ----
 auth_bp = Blueprint("auth_bp", __name__)
 
+
+@auth_bp.teardown_request
+def remove_session(exception=None):
+    """Ensure scoped sessions are removed after each request."""
+    if hasattr(Session, "remove"):
+        Session.remove()
+
 # ---- Inline templates ----
 BASE = """
 <!doctype html>
@@ -203,15 +210,13 @@ def approve_user():
     if not _require_admin():
         return redirect(url_for('auth_bp.auth_page'))
     email = request.form.get('email','').strip().lower()
-    db = Session()
-    user = db.query(User).filter_by(email=email).first()
-    if not user:
-        db.close()
-        flash('User not found', 'warning')
-        return redirect(url_for('auth_bp.users_page'))
-    user.is_approved = True
-    db.commit()
-    db.close()
+    with Session() as db:
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            flash('User not found', 'warning')
+            return redirect(url_for('auth_bp.users_page'))
+        user.is_approved = True
+        db.commit()
     flash(f'Approved {email}', 'info')
     return redirect(url_for('auth_bp.users_page'))
 

@@ -14,6 +14,13 @@ from db import Session, Quote
 
 admin_bp = Blueprint("admin_bp", __name__)
 
+
+@admin_bp.teardown_request
+def remove_session(exception=None):
+    """Ensure scoped sessions are removed after each request."""
+    if hasattr(Session, "remove"):
+        Session.remove()
+
 # ---------------- Templates ----------------
 BASE = """
 <!doctype html>
@@ -103,9 +110,8 @@ def quotes_html():
         flash("Admin login required.", "warning")
         return redirect(url_for("quote_bp.quote"))
 
-    db = Session()
-    quotes = db.query(Quote).all()
-    db.close()
+    with Session() as db:
+        quotes = db.query(Quote).all()
 
     _ensure_templates()
     return render_template_string(ADMIN_QUOTES, title="All Quotes", quotes=quotes)
@@ -117,9 +123,8 @@ def quotes_csv():
         flash("Admin login required.", "warning")
         return redirect(url_for("quote_bp.quote"))
 
-    db = Session()
-    quotes = db.query(Quote).all()
-    db.close()
+    with Session() as db:
+        quotes = db.query(Quote).all()
 
     output = io.StringIO()
     writer = csv.writer(output)

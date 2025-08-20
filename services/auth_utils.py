@@ -26,16 +26,13 @@ def is_valid_password(password: str) -> bool:
 
 def authenticate(email: str, password: str) -> Tuple[Optional[User], Optional[str]]:
     """Return user if credentials are valid, otherwise an error message."""
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).filter_by(email=email).first()
         if not user or not check_password_hash(getattr(user, "password_hash", ""), password):
             return None, "Invalid credentials"
         if not getattr(user, "is_approved", True):
             return None, "Account pending approval"
         return user, None
-    finally:
-        db.close()
 
 
 def register_user(data: dict, auto_approve: bool = False) -> Optional[str]:
@@ -44,8 +41,7 @@ def register_user(data: dict, auto_approve: bool = False) -> Optional[str]:
     password = data.get("password")
     if not is_valid_password(password or ""):
         return "Password does not meet complexity requirements."
-    db = Session()
-    try:
+    with Session() as db:
         if db.query(User).filter_by(email=email).first():
             return "Email already registered."
         new_user = User(
@@ -61,22 +57,16 @@ def register_user(data: dict, auto_approve: bool = False) -> Optional[str]:
         db.add(new_user)
         db.commit()
         return None
-    finally:
-        db.close()
 
 
 def list_users():
-    db = Session()
-    try:
+    with Session() as db:
         return db.query(User).all()
-    finally:
-        db.close()
 
 
 def create_reset_token(email: str) -> Tuple[Optional[str], Optional[str]]:
     """Create a one-use reset token for the user with given email."""
-    db = Session()
-    try:
+    with Session() as db:
         user = db.query(User).filter_by(email=email).first()
         if not user:
             return None, "No user found with that email."
@@ -86,16 +76,13 @@ def create_reset_token(email: str) -> Tuple[Optional[str], Optional[str]]:
         db.add(reset_token)
         db.commit()
         return token, None
-    finally:
-        db.close()
 
 
 def reset_password_with_token(token: str, new_password: str) -> Optional[str]:
     """Reset user password using a valid token."""
     if not is_valid_password(new_password):
         return "Password does not meet complexity requirements."
-    db = Session()
-    try:
+    with Session() as db:
         reset = db.query(PasswordResetToken).filter_by(token=token, used=False).first()
         if not reset or reset.expires_at < datetime.utcnow():
             return "Invalid or expired token."
@@ -106,5 +93,3 @@ def reset_password_with_token(token: str, new_password: str) -> Optional[str]:
         reset.used = True
         db.commit()
         return None
-    finally:
-        db.close()

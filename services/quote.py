@@ -115,62 +115,56 @@ def create_quote(
     if quote_type == "Air" and guarantee_selected:
         quote_total *= 1.25
 
-    db = Session()
-    q = Quote(
-        user_id=user_id,
-        user_email=user_email,
-        quote_type=quote_type,
-        origin=origin,
-        destination=destination,
-        weight=billable_weight,
-        weight_method=weight_method,
-        actual_weight=actual_weight,
-        dim_weight=dim_weight,
-        pieces=pieces,
-        length=length,
-        width=width,
-        height=height,
-        zone=str(result.get("zone", "")),
-        total=quote_total,
-        quote_metadata=", ".join(accessorials or []),
-    )
-    db.add(q)
-    db.commit()
-    db.refresh(q)
-    db.close()
-    return q
+    with Session() as db:
+        q = Quote(
+            user_id=user_id,
+            user_email=user_email,
+            quote_type=quote_type,
+            origin=origin,
+            destination=destination,
+            weight=billable_weight,
+            weight_method=weight_method,
+            actual_weight=actual_weight,
+            dim_weight=dim_weight,
+            pieces=pieces,
+            length=length,
+            width=width,
+            height=height,
+            zone=str(result.get("zone", "")),
+            total=quote_total,
+            quote_metadata=", ".join(accessorials or []),
+        )
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+        return q
 
 
 def get_quote(quote_id: str):
-    db = Session()
-    q = db.query(Quote).filter_by(quote_id=quote_id).first()
-    db.close()
-    return q
+    with Session() as db:
+        return db.query(Quote).filter_by(quote_id=quote_id).first()
 
 
 def list_quotes():
-    db = Session()
-    quotes = db.query(Quote).all()
-    db.close()
-    return quotes
+    with Session() as db:
+        return db.query(Quote).all()
 
 
 def create_email_request(quote_id: str, data: dict):
-    db = Session()
-    req = EmailQuoteRequest(
-        quote_id=quote_id,
-        shipper_name=data.get("shipper_name"),
-        shipper_address=data.get("shipper_address"),
-        shipper_contact=data.get("shipper_contact"),
-        shipper_phone=data.get("shipper_phone"),
-        consignee_name=data.get("consignee_name"),
-        consignee_address=data.get("consignee_address"),
-        consignee_contact=data.get("consignee_contact"),
-        consignee_phone=data.get("consignee_phone"),
-        total_weight=data.get("total_weight"),
-        special_instructions=data.get("special_instructions"),
-    )
-    db.add(req)
-    db.commit()
-    db.close()
-    return req
+    with Session() as db:
+        req = EmailQuoteRequest(
+            quote_id=quote_id,
+            shipper_name=data.get("shipper_name"),
+            shipper_address=data.get("shipper_address"),
+            shipper_contact=data.get("shipper_contact"),
+            shipper_phone=data.get("shipper_phone"),
+            consignee_name=data.get("consignee_name"),
+            consignee_address=data.get("consignee_address"),
+            consignee_contact=data.get("consignee_contact"),
+            consignee_phone=data.get("consignee_phone"),
+            total_weight=data.get("total_weight"),
+            special_instructions=data.get("special_instructions"),
+        )
+        db.add(req)
+        db.commit()
+        return req
