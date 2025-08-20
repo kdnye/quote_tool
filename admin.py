@@ -5,6 +5,25 @@ from db import Session, User
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
+
+@bp.before_request
+def _csrf_protect():
+    """Reject mutating requests missing the ``X-CSRFToken`` header.
+
+    The JavaScript frontend is expected to include this header for
+    POST/DELETE requests.  The admin API historically did not enforce
+    the header which left the endpoints unprotected from cross-site
+    request forgery.  Adding the check here keeps the routes lightweight
+    while allowing the tests to verify that a 400 response is returned
+    when the header is absent.
+    """
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        if not request.headers.get("X-CSRFToken"):
+            return (
+                jsonify({"ok": False, "error": "Missing CSRF token."}),
+                400,
+            )
+
 # ---- Auth guards (reuse your own if you already have them) ----
 from functools import wraps
 
