@@ -1,4 +1,5 @@
 import pandas as pd
+
 from db import Session, Quote, EmailQuoteRequest
 from quote.utils import normalize_workbook
 from quote.logic_hotshot import calculate_hotshot_quote
