@@ -1,6 +1,9 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session, flash
 from functools import wraps
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from db import Session, User, Base, engine
 
 # [Unverified] If you have a real Config class, keep this import; otherwise, define a minimal one.
 try:
@@ -11,6 +14,7 @@ except Exception:
 
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 app.config.from_object(Config)
+Base.metadata.create_all(engine)
 
 # ---- Session defaults ----
 @app.before_request
@@ -25,6 +29,11 @@ def set_defaults():
     session.setdefault("page", "quote")      # PUBLIC by default
     session.setdefault("role", "guest")      # guest/user/admin
 
+# Ensure DB sessions are cleaned up
+@app.teardown_request
+def remove_session(exception=None):
+    Session.remove()
+
 # ---- Auth helpers ----
 def require_admin(view):
     @wraps(view)
@@ -35,12 +44,21 @@ def require_admin(view):
         return view(*args, **kwargs)
     return wrapped
 
-# ---- Minimal in-memory store (replace with DB) ----
-USERS = {
-    # username: {password, role, name, email}
-    "admin": {"password": "admin123", "role": "admin", "name": "FSI Admin", "email": "admin@example.com"}
-}
+# ---- Data store ----
 QUOTES = []  # simple list for demo purposes
+
+# Ensure a default admin user exists in the database
+_init_sess = Session()
+if not _init_sess.query(User).filter_by(email="admin@example.com").first():
+    admin = User(
+        name="FSI Admin",
+        email="admin@example.com",
+        password_hash=generate_password_hash("admin123"),
+        role="admin",
+    )
+    _init_sess.add(admin)
+    _init_sess.commit()
+Session.remove()
 
 # ---- Templates (inline for single-file demo) ----
 BASE = """
@@ -103,7 +121,7 @@ AUTH = """
   <details open>
     <summary>Login</summary>
     <form method="post" action="{{ url_for('login') }}">
-      <label>Username <input name="username" required /></label>
+      <label>Email <input type="email" name="email" required /></label>
       <label>Password <input type="password" name="password" required /></label>
       <button type="submit">Login</button>
     </form>
@@ -112,10 +130,9 @@ AUTH = """
   <details>
     <summary>Register</summary>
     <form method="post" action="{{ url_for('register') }}">
-      <label>Username <input name="username" required /></label>
+      <label>Email <input type="email" name="email" required /></label>
       <label>Password <input type="password" name="password" required /></label>
       <label>Name <input name="name" /></label>
-      <label>Email <input type="email" name="email" /></label>
       <button type="submit">Register</button>
     </form>
   </details>
@@ -186,10 +203,10 @@ ADMIN = """
   {% if view == 'Manage Users' %}
     <h3>Users</h3>
     <table>
-      <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <thead><tr><th>Email</th><th>Name</th><th>Role</th></tr></thead>
       <tbody>
-        {% for u, meta in users.items() %}
-          <tr><td>{{ u }}</td><td>{{ meta.get('name','') }}</td><td>{{ meta.get('email','') }}</td><td>{{ meta.get('role','') }}</td></tr>
+        {% for u in users %}
+          <tr><td>{{ u.email }}</td><td>{{ u.name }}</td><td>{{ u.role }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -232,32 +249,32 @@ def auth():
 
 @app.route('/login', methods=['POST'])
 def login():
-    username = request.form.get('username','').strip()
+    email = request.form.get('email','').strip().lower()
     password = request.form.get('password','')
-    user = USERS.get(username)
-    if not user or user.get('password') != password:
+    user = Session.query(User).filter_by(email=email).first()
+    if not user or not check_password_hash(user.password_hash, password):
         flash('Invalid credentials', 'warning')
         return redirect(url_for('auth'))
-    # success
     session.update({
-        'user': username,
-        'name': user.get('name', username),
-        'email': user.get('email',''),
-        'role': user.get('role','user'),
+        'user': user.id,
+        'name': user.name,
+        'email': user.email,
+        'role': user.role or 'user',
     })
     flash('Logged in successfully', 'info')
     return redirect(url_for('admin' if session.get('role')=='admin' else 'quote'))
 
 @app.route('/register', methods=['POST'])
 def register():
-    username = request.form.get('username','').strip()
+    email = request.form.get('email','').strip().lower()
     password = request.form.get('password','')
-    name = request.form.get('name','').strip() or username
-    email = request.form.get('email','').strip()
-    if username in USERS:
-        flash('Username already exists', 'warning')
+    name = request.form.get('name','').strip() or email
+    if Session.query(User).filter_by(email=email).first():
+        flash('Email already registered', 'warning')
         return redirect(url_for('auth'))
-    USERS[username] = { 'password': password, 'role': 'user', 'name': name, 'email': email }
+    user = User(name=name, email=email, password_hash=generate_password_hash(password), role='user')
+    Session.add(user)
+    Session.commit()
     flash('Registered. You can now log in.', 'info')
     return redirect(url_for('auth'))
 
@@ -319,7 +336,8 @@ def email_request():
 def admin():
     session['page'] = 'admin'
     view = request.args.get('view', 'Manage Users')
-    return render_template_string(ADMIN, users=USERS, quotes=QUOTES, view=view, title='Admin')
+    users = Session.query(User).all()
+    return render_template_string(ADMIN, users=users, quotes=QUOTES, view=view, title='Admin')
 
 if __name__ == '__main__':
     # Run: python app.py
