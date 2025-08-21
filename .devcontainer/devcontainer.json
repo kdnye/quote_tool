@@ -1,7 +1,7 @@
 {
   "name": "quote_tool",
   "build": {
-    "dockerfile": "../Dockerfile",
+    "dockerfile": "Dockerfile",
     "context": ".."
   },
   "forwardPorts": [8000],
