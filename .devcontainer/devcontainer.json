@@ -1,8 +1,8 @@
 {
   "name": "quote_tool",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
+    "context": "..",
+    "dockerfile": "Dockerfile"
   },
   "forwardPorts": [8000],
   "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
