@@ -340,5 +340,5 @@ def admin():
     return render_template_string(ADMIN, users=users, quotes=QUOTES, view=view, title='Admin')
 
 if __name__ == '__main__':
-    # Run: python app.py
+    # Run: python legacy_app.py
     app.run(debug=True)
